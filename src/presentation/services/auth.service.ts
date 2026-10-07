@@ -14,7 +14,7 @@ export class AuthService{
       });
 
       if(existUser){
-        throw new Error('El nombre de usuario ya está registrado');
+        throw new Error(`El nombre de usuario '${usuario}' ya está registrado`);
       }
 
       const passwordHash = BcryptAdapter.hash(password);
