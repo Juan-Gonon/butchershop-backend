@@ -7,11 +7,7 @@ export class AuthController {
   constructor(private readonly authService: AuthService){}
 
   public loginUser = async (req: Request, res: Response) => {
-    
-    this.authService
-      .testConection()
-      .then(roles => res.json({ok: true, roles}))
-      .catch((error) => res.status(500).json({ok: false, error}));
+    res.json({data: 'Revalidate'});
   };
 
   public createUser = async(req: Request, res: Response) => {
@@ -19,7 +15,10 @@ export class AuthController {
 
     if(error) return res.status(400).json({ok: false, error});
 
-    return res.json({ok: true, createUserDto});
+    this.authService
+      .CreateUser(createUserDto!)
+      .then((user) => res.status(201).json({ok: true, user}))
+      .catch((error) => res.status(400).json({ok: false, error: error.message}));
   };
 
   public revalidateToken = async (req: Request, res: Response) => {
