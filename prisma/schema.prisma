@@ -1,0 +1,196 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model carnicerias {
+  id                           BigInt                         @id @default(autoincrement())
+  nombre                       String                         @db.VarChar(150)
+  telefono_whatsapp            String?                        @unique @db.VarChar(30)
+  direccion                    String?
+  activo                       Boolean                        @default(true)
+  fecha_creacion               DateTime                       @default(now()) @db.Timestamptz(6)
+  clientes                     clientes[]
+  direcciones_envio_carniceria direcciones_envio_carniceria[]
+  pedidos                      pedidos[]
+  productos_carniceria         productos_carniceria[]
+  tipos_preparacion            tipos_preparacion[]
+  usuarios                     usuarios[]
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model categorias {
+  id                 BigInt               @id @default(autoincrement())
+  nombre             String               @db.VarChar(100)
+  id_tipo_carne      BigInt
+  tipos_carne        tipos_carne          @relation(fields: [id_tipo_carne], references: [id], map: "fk_categorias_tipo_carne")
+  productos_catalogo productos_catalogo[]
+
+  @@unique([nombre, id_tipo_carne], map: "uq_categorias_nombre_tipo")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model clientes {
+  id                BigInt      @id @default(autoincrement())
+  id_carniceria     BigInt
+  nombre            String      @db.VarChar(150)
+  telefono          String?     @db.VarChar(30)
+  direccion_defecto String?
+  es_generico       Boolean     @default(false)
+  fecha_registro    DateTime    @default(now()) @db.Timestamptz(6)
+  carnicerias       carnicerias @relation(fields: [id_carniceria], references: [id], onDelete: Cascade, map: "fk_clientes_carniceria")
+  pedidos           pedidos[]
+
+  @@unique([telefono, id_carniceria], map: "uq_cliente_telefono_carniceria")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model detalle_pedidos {
+  id                     BigInt               @id @default(autoincrement())
+  id_pedido              BigInt
+  id_producto_carniceria BigInt
+  id_tipo_preparacion    BigInt?
+  cantidad               Decimal              @db.Decimal(10, 2)
+  precio_unitario        Decimal              @db.Decimal(10, 2)
+  subtotal               Decimal              @db.Decimal(10, 2)
+  observaciones          String?
+  pedidos                pedidos              @relation(fields: [id_pedido], references: [id], onDelete: Cascade, map: "fk_detalle_pedidos_pedido")
+  productos_carniceria   productos_carniceria @relation(fields: [id_producto_carniceria], references: [id], map: "fk_detalle_pedidos_producto")
+  tipos_preparacion      tipos_preparacion?   @relation(fields: [id_tipo_preparacion], references: [id], map: "fk_detalle_preparacion")
+
+  @@unique([id_pedido, id_producto_carniceria, id_tipo_preparacion], map: "uq_pedido_producto_preparacion")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model direcciones_envio_carniceria {
+  id             BigInt      @id @default(autoincrement())
+  id_carniceria  BigInt
+  nombre_sector  String      @db.VarChar(150)
+  costo_envio    Decimal     @default(0.00) @db.Decimal(10, 2)
+  activo         Boolean     @default(true)
+  fecha_creacion DateTime    @default(now()) @db.Timestamptz(6)
+  carnicerias    carnicerias @relation(fields: [id_carniceria], references: [id], onDelete: Cascade, map: "fk_direcciones_carniceria")
+  pedidos        pedidos[]
+
+  @@unique([id_carniceria, nombre_sector], map: "uq_carniceria_sector")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model estados_pedido {
+  id      BigInt    @id @default(autoincrement())
+  nombre  String    @unique @db.VarChar(50)
+  pedidos pedidos[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model pedidos {
+  id                           BigInt                        @id @default(autoincrement())
+  id_carniceria                BigInt
+  id_cliente                   BigInt
+  id_estado                    BigInt
+  id_tipo_entrega              BigInt
+  id_direccion_envio           BigInt?
+  costo_envio                  Decimal                       @default(0.00) @db.Decimal(10, 2)
+  canal_origen                 String                        @default("pos") @db.VarChar(30)
+  fecha                        DateTime                      @default(now()) @db.Timestamptz(6)
+  total                        Decimal                       @default(0) @db.Decimal(10, 2)
+  detalle_pedidos              detalle_pedidos[]
+  carnicerias                  carnicerias                   @relation(fields: [id_carniceria], references: [id], onDelete: Cascade, map: "fk_pedidos_carniceria")
+  clientes                     clientes                      @relation(fields: [id_cliente], references: [id], map: "fk_pedidos_cliente")
+  direcciones_envio_carniceria direcciones_envio_carniceria? @relation(fields: [id_direccion_envio], references: [id], map: "fk_pedidos_direccion_envio")
+  estados_pedido               estados_pedido                @relation(fields: [id_estado], references: [id], map: "fk_pedidos_estado")
+  tipos_entrega                tipos_entrega                 @relation(fields: [id_tipo_entrega], references: [id], map: "fk_pedidos_tipo_entrega")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model productos_carniceria {
+  id                   BigInt             @id @default(autoincrement())
+  id_carniceria        BigInt
+  id_producto_catalogo BigInt
+  id_unidad_venta      BigInt
+  precio               Decimal            @db.Decimal(10, 2)
+  disponible           Boolean            @default(true)
+  maneja_inventario    Boolean            @default(false)
+  stock_actual         Decimal?           @db.Decimal(10, 2)
+  detalle_pedidos      detalle_pedidos[]
+  carnicerias          carnicerias        @relation(fields: [id_carniceria], references: [id], onDelete: Cascade, map: "fk_productos_carniceria")
+  unidades_venta       unidades_venta     @relation(fields: [id_unidad_venta], references: [id], map: "fk_productos_carniceria_unidad")
+  productos_catalogo   productos_catalogo @relation(fields: [id_producto_catalogo], references: [id], map: "fk_productos_catalogo")
+
+  @@unique([id_carniceria, id_producto_catalogo, id_unidad_venta], map: "uq_carniceria_producto_unidad")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model productos_catalogo {
+  id                      BigInt                 @id @default(autoincrement())
+  nombre                  String                 @unique @db.VarChar(150)
+  id_categoria            BigInt
+  id_unidad_venta_defecto BigInt
+  descripcion_general     String?
+  imagen_url              String?                @db.VarChar(500)
+  productos_carniceria    productos_carniceria[]
+  categorias              categorias             @relation(fields: [id_categoria], references: [id], map: "fk_catalogo_categoria")
+  unidades_venta          unidades_venta         @relation(fields: [id_unidad_venta_defecto], references: [id], map: "fk_catalogo_unidad_defecto")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model roles {
+  id       BigInt     @id @default(autoincrement())
+  nombre   String     @unique @db.VarChar(50)
+  usuarios usuarios[]
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model tipos_carne {
+  id         BigInt       @id @default(autoincrement())
+  nombre     String       @unique @db.VarChar(100)
+  categorias categorias[]
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model tipos_entrega {
+  id      BigInt    @id @default(autoincrement())
+  nombre  String    @unique @db.VarChar(50)
+  pedidos pedidos[]
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model tipos_preparacion {
+  id              BigInt            @id @default(autoincrement())
+  id_carniceria   BigInt?
+  nombre          String            @db.VarChar(100)
+  descripcion     String?
+  detalle_pedidos detalle_pedidos[]
+  carnicerias     carnicerias?      @relation(fields: [id_carniceria], references: [id], onDelete: Cascade, map: "fk_preparacion_carniceria")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model unidades_venta {
+  id                   BigInt                 @id @default(autoincrement())
+  nombre               String                 @unique @db.VarChar(50)
+  abreviatura          String                 @unique @db.VarChar(20)
+  productos_carniceria productos_carniceria[]
+  productos_catalogo   productos_catalogo[]
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model usuarios {
+  id             BigInt      @id @default(autoincrement())
+  id_carniceria  BigInt
+  nombre         String      @db.VarChar(150)
+  email          String      @unique @db.VarChar(150)
+  password_hash  String
+  activo         Boolean     @default(true)
+  fecha_creacion DateTime    @default(now()) @db.Timestamptz(6)
+  id_rol         BigInt
+  carnicerias    carnicerias @relation(fields: [id_carniceria], references: [id], onDelete: Cascade, map: "fk_usuarios_carniceria")
+  roles          roles       @relation(fields: [id_rol], references: [id], map: "fk_usuarios_rol")
+}
