@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { AuthService } from '../../services/auth.service.js';
+import { CreateUserDto } from '../../../domain/Dtos/users/createUser.Dtos.js';
 
 export class AuthController {
 
@@ -14,7 +15,11 @@ export class AuthController {
   };
 
   public createUser = async(req: Request, res: Response) => {
-    res.json({data: req.body});
+    const [error, createUserDto] = CreateUserDto.create(req.body);
+
+    if(error) return res.status(400).json({ok: false, error});
+
+    return res.json({ok: true, createUserDto});
   };
 
   public revalidateToken = async (req: Request, res: Response) => {
