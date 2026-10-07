@@ -17,6 +17,9 @@ export class Server {
     this.PORT = port;
     this.PUBLIC_PATH = publicPath;
     this.routes = routes;
+    this.app.set('json replacer', (_key: string, value: unknown) =>
+      typeof value === 'bigint' ? Number(value) : value
+    );
   }
 
   start = async() => {
