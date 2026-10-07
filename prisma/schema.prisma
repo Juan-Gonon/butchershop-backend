@@ -186,11 +186,12 @@ model usuarios {
   id             BigInt      @id @default(autoincrement())
   id_carniceria  BigInt
   nombre         String      @db.VarChar(150)
-  email          String      @unique @db.VarChar(150)
+  email          String?     @unique @db.VarChar(150)
   password_hash  String
   activo         Boolean     @default(true)
   fecha_creacion DateTime    @default(now()) @db.Timestamptz(6)
   id_rol         BigInt
+  usuario        String?     @unique @db.VarChar(50)
   carnicerias    carnicerias @relation(fields: [id_carniceria], references: [id], onDelete: Cascade, map: "fk_usuarios_carniceria")
   roles          roles       @relation(fields: [id_rol], references: [id], map: "fk_usuarios_rol")
 }
