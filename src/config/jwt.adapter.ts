@@ -10,8 +10,9 @@ export class JwtAdapter {
    * @param payload Objeto con la información a codificar
    * @param duration Duración del token (ej. '2h', '1d', '7d')
    */
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  static async generateToken(payload: any, duration = '2h'): Promise<string | null> {
+  static async generateToken(payload: Record<string, any>, duration = '2h'): Promise<string | null> {
     return new Promise((resolve) => {
       const options: SignOptions = {
         expiresIn: duration as SignOptions['expiresIn']
