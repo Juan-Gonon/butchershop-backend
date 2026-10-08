@@ -1,10 +1,40 @@
 import { BcryptAdapter } from '../../config/bcrypt.adapter.js';
 import { prisma } from '../../data/postgres/index.js';
 import { CreateUserDto } from '../../domain/Dtos/users/createUser.Dtos.js';
+import { LoginUserDto } from '../../domain/Dtos/users/loginUser.Dtos.js';
 import { CustomError } from '../../domain/errors/custom.error.js';
 
 export class AuthService{
   //constructor(){}
+
+  public async loginUser(loginUserDto: LoginUserDto){
+    const { usuario, password } = loginUserDto;
+    try {
+      const user = await prisma.usuarios.findUnique({
+        where: {
+          usuario
+        }
+      });
+
+      if(!user) throw CustomError.badRequest('Credenciales no válidas');
+      if(!user.activo) throw CustomError.unauthorized('Usuario inactivo, contacte al administrador');
+
+      const isMatching = BcryptAdapter.compare(password, user.password_hash);
+
+      if(!isMatching) throw CustomError.badRequest('Credenciales no válidas');
+
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { password_hash, ...userEntity } = user;
+
+      return userEntity;
+      
+    } catch (error) {
+      if(error instanceof CustomError) throw error;
+
+      CustomError.internalServer();
+    }
+
+  }
 
   public async CreateUser(createUserDto: CreateUserDto){
     const {nombre, usuario, password, id_carniceria, id_rol, email } = createUserDto;

@@ -22,10 +22,9 @@ export class AuthController {
 
     if(error) return res.status(400).json({ok: false, error});
 
-    return res.json({
-      ok: true,
-      loginUserDto
-    });
+    this.authService.loginUser(loginUserDto!)
+      .then((user) => res.status(201).json({ok: true, user}))
+      .catch((error) => this.handleError(error, res));
 
   };
 
