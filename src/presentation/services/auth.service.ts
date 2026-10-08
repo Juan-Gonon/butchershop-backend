@@ -1,4 +1,5 @@
 import { BcryptAdapter } from '../../config/bcrypt.adapter.js';
+import { JwtAdapter } from '../../config/jwt.adapter.js';
 import { prisma } from '../../data/postgres/index.js';
 import { CreateUserDto } from '../../domain/Dtos/users/createUser.Dtos.js';
 import { LoginUserDto } from '../../domain/Dtos/users/loginUser.Dtos.js';
@@ -23,11 +24,23 @@ export class AuthService{
 
       if(!isMatching) throw CustomError.badRequest('Credenciales no válidas');
 
+      const token = await JwtAdapter.generateToken({
+        id: Number(user.id),
+        id_carniceria: Number(user.id_carniceria),
+        id_rol: Number(user.id_rol)
+      });
+
+      if(!token){
+        throw CustomError.internalServer('Error al genera el JWT');
+      }
+
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { password_hash, ...userEntity } = user;
 
-      return userEntity;
-      
+      return {
+        user: userEntity,
+        token
+      };
     } catch (error) {
       if(error instanceof CustomError) throw error;
 
