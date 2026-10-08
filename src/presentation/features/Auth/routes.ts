@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { AuthController } from './controller.js';
 import { AuthService } from '../../services/auth.service.js';
+import { AuthMiddleware } from '../../middleware/validateJWT.js';
 
 export class AuthRouter{
   
@@ -14,7 +15,7 @@ export class AuthRouter{
 
     router.post('/new', controller.createUser);
 
-    router.get('/renew', controller.revalidateToken);
+    router.get('/renew', [AuthMiddleware.validateJWT],  controller.renewToken);
 
     return router;
     

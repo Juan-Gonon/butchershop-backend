@@ -9,14 +9,14 @@ export class AuthMiddleware {
 
   static async validateJWT(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     // Obtener el header Authorization
-    const authorization = req.header('Authorization');
-
-    if (!authorization) throw CustomError.unauthorized('No token provider');
-    if (!authorization.startsWith('Bearer ')) throw CustomError.unauthorized('Invalid token format (must be Bearer)');
-
-    const token = authorization.split(' ').at(1) || '';
 
     try {
+      const authorization = req.header('Authorization');
+
+      if (!authorization) throw CustomError.unauthorized('No token provider');
+      if (!authorization.startsWith('Bearer ')) throw CustomError.unauthorized('Invalid token format (must be Bearer)');
+
+      const token = authorization.split(' ').at(1) || '';
       // Validar el JWT mediante nuestro JwtAdapter
       const payload = await JwtAdapter.validateToken<JwtPayload>(token);
 
@@ -37,8 +37,12 @@ export class AuthMiddleware {
       next();
 
     } catch (error) {
-      if(error instanceof CustomError) throw error;
-      CustomError.internalServer();
+      if (error instanceof CustomError) {
+        return res.status(error.statusCode).json({ ok: false, error: error.message });
+      }
+
+      //console.error(`${error}`);
+      return res.status(500).json({ ok: false, error: 'Internal server error' });
     }
   }
 }

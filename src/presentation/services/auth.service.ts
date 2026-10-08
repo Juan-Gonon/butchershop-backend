@@ -49,6 +49,46 @@ export class AuthService{
 
   }
 
+  public async renewToken(userId: number | string) {
+    try {
+      const user = await prisma.usuarios.findUnique({
+        where: { id: BigInt(userId) }
+      });
+
+      if (!user) {
+        throw CustomError.notFound('Usuario no encontrado');
+      }
+
+      if (!user.activo) {
+        throw CustomError.unauthorized('Usuario inactivo');
+      }
+
+      // Generar un nuevo JWT
+      const token = await JwtAdapter.generateToken({
+        id: Number(user.id),
+        id_carniceria: Number(user.id_carniceria),
+        id_rol: Number(user.id_rol)
+      });
+
+      if (!token) {
+        throw CustomError.internalServer('Error al renovar el token');
+      }
+
+      // Excluir el password_hash
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { password_hash, ...userEntity } = user;
+
+      return {
+        user: userEntity,
+        token
+      };
+      
+    } catch (error) {
+      if (error instanceof CustomError) throw error;
+      throw CustomError.internalServer();
+    }
+  }
+
   public async CreateUser(createUserDto: CreateUserDto){
     const {nombre, usuario, password, id_carniceria, id_rol, email } = createUserDto;
      

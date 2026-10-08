@@ -3,6 +3,7 @@ import { AuthService } from '../../services/auth.service.js';
 import { CreateUserDto } from '../../../domain/Dtos/users/createUser.Dtos.js';
 import { CustomError } from '../../../domain/errors/custom.error.js';
 import { LoginUserDto } from '../../../domain/Dtos/users/loginUser.Dtos.js';
+import { AuthenticatedRequest } from '../../../domain/interfaces/authenticatesRequest.interface.js';
 
 export class AuthController {
 
@@ -39,7 +40,13 @@ export class AuthController {
       .catch((error) => this.handleError(error, res));
   };
 
-  public revalidateToken = async (req: Request, res: Response) => {
-    res.json({data: 'Revalidate'});
+  public renewToken = async (req: AuthenticatedRequest, res: Response) => {
+    // req.user fue inyectado de forma segura por el AuthMiddleware
+    const userId = req.user!.id;
+
+    this.authService
+      .renewToken(userId)
+      .then((data) => res.json({ ok: true, ...data }))
+      .catch((error) => this.handleError(error, res));
   };
 }
