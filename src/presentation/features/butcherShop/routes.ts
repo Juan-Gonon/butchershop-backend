@@ -3,12 +3,14 @@ import { AuthMiddleware } from '../../middleware/validateJWT.js';
 import { RoleMiddleware } from '../../middleware/validateRole.js';
 import { Role } from '../../../domain/types/roles.enums.js';
 import { ButcherShopController } from './controller.js';
+import { ButcherShopService } from '../../services/butcherShop.service.js';
 
 export class ButcherShopRouter {
 
   static get routes(): Router {
     const router = Router();
-    const controller = new ButcherShopController();
+    const service = new ButcherShopService();
+    const controller = new ButcherShopController(service);
 
     router.use(AuthMiddleware.validateJWT);
     router.use(RoleMiddleware.authorizeRoles(Role.SUPER_ADMIN));
