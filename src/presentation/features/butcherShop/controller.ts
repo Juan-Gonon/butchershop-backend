@@ -28,7 +28,9 @@ export class ButcherShopController{
 
     if(error) return res.status(400).json({ok: false, error});
 
-    return res.status(201).json(createBtucherShop);
+    this.butcherShopService.createButcherShop(createBtucherShop!)
+      .then((data) => res.status(201).json({ok: true, data}))
+      .catch((error) => this.handleError(error, res));
   };
   public updateButcherShop = async (req: AuthenticatedRequest, res: Response) => {
     throw 'Implement';
