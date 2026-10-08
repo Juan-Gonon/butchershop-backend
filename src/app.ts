@@ -7,6 +7,11 @@ import { AppRouter } from './routers/routes.js';
 })();
 
 async function main() {
-  const server = new Server({port: envs.PORT, publicPath: envs.PUBLIC_PATH, routes: AppRouter.router});
+  const server = new Server({
+    port: envs.PORT, 
+    publicPath: envs.PUBLIC_PATH, 
+    routes: AppRouter.router,
+    allowedOrigins: envs.ALLOWED_ORIGINS
+  });
   server.start();
 }
