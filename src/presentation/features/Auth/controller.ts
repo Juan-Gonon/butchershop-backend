@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { AuthService } from '../../services/auth.service.js';
 import { CreateUserDto } from '../../../domain/Dtos/users/createUser.Dtos.js';
 import { CustomError } from '../../../domain/errors/custom.error.js';
+import { LoginUserDto } from '../../../domain/Dtos/users/loginUser.Dtos.js';
 
 export class AuthController {
 
@@ -17,7 +18,15 @@ export class AuthController {
   };
 
   public loginUser = async (req: Request, res: Response) => {
-    res.json({data: 'Revalidate'});
+    const [error, loginUserDto] = LoginUserDto.create(req.body);
+
+    if(error) return res.status(400).json({ok: false, error});
+
+    return res.json({
+      ok: true,
+      loginUserDto
+    });
+
   };
 
   public createUser = async(req: Request, res: Response) => {
