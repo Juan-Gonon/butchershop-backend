@@ -3,6 +3,7 @@ import { AuthenticatedRequest } from '../../../domain/interfaces/authenticatesRe
 import { ButcherShopService } from '../../services/butcherShop.service.js';
 import { CustomError } from '../../../domain/errors/custom.error.js';
 import { CreateButcherShop } from '../../../domain/Dtos/butcherShop/createButcherShop.dto.js';
+import { UpdateButcherShop } from '../../../domain/Dtos/butcherShop/updateButcherShop.dto.js';
 
 export class ButcherShopController{
   constructor(public readonly butcherShopService: ButcherShopService){}
@@ -24,16 +25,23 @@ export class ButcherShopController{
   };
 
   public createButcherShop = async (req: AuthenticatedRequest, res: Response) => {
-    const [error, createBtucherShop ] = CreateButcherShop.create(req.body);
+    const [error, createButcher ] = CreateButcherShop.create(req.body);
 
     if(error) return res.status(400).json({ok: false, error});
 
-    this.butcherShopService.createButcherShop(createBtucherShop!)
+    this.butcherShopService.createButcherShop(createButcher!)
       .then((data) => res.status(201).json({ok: true, data}))
       .catch((error) => this.handleError(error, res));
   };
   public updateButcherShop = async (req: AuthenticatedRequest, res: Response) => {
-    throw 'Implement';
+    const id = +req.params.id;
+    const [error, updateButcher] = UpdateButcherShop.create({...req.body, id});
+
+    if(error) return res.status(400).json({ok: false, error});
+
+    this.butcherShopService.updateButcherShop(updateButcher!)
+      .then((data) => res.status(200).json({ok: true, data}))
+      .catch((error) => this.handleError(error, res));
   };
 
   public deleteButcherShop = async (req: AuthenticatedRequest, res: Response) => {
