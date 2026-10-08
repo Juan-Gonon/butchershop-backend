@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { AuthenticatedRequest } from '../../../domain/interfaces/authenticatesRequest.interface.js';
 import { ButcherShopService } from '../../services/butcherShop.service.js';
 import { CustomError } from '../../../domain/errors/custom.error.js';
+import { CreateButcherShop } from '../../../domain/Dtos/butcherShop/createButcherShop.dto.js';
 
 export class ButcherShopController{
   constructor(public readonly butcherShopService: ButcherShopService){}
@@ -23,7 +24,11 @@ export class ButcherShopController{
   };
 
   public createButcherShop = async (req: AuthenticatedRequest, res: Response) => {
-    throw 'Implement';
+    const [error, createBtucherShop ] = CreateButcherShop.create(req.body);
+
+    if(error) return res.status(400).json({ok: false, error});
+
+    return res.status(201).json(createBtucherShop);
   };
   public updateButcherShop = async (req: AuthenticatedRequest, res: Response) => {
     throw 'Implement';
