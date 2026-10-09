@@ -20,7 +20,7 @@ export class ButcherShopController{
   public getAllButcherShop = async (req: AuthenticatedRequest, res: Response) => {
 
     this.butcherShopService.getAllBucherShop()
-      .then((butcherShop) => res.status(201).json({ok: true, butcherShop}))
+      .then((butcherShop) => res.status(200).json({ok: true, butcherShop}))
       .catch((error) => this.handleError(error, res));
   };
 
