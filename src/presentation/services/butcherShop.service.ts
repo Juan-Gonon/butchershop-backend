@@ -10,10 +10,16 @@ export class ButcherShopService{
     try {
 
       const butcherShop = await prisma.carnicerias.findMany({
-        include: {
+        select: {
+          uuid: true, 
+          nombre: true,
+          telefono_whatsapp: true,
+          direccion: true,
+          activo: true,
+          fecha_creacion: true,
           usuarios: {
             select: {
-              id: true,
+              uuid: true, 
               nombre: true,
               usuario: true,
               id_rol: true
