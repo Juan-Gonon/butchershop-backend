@@ -3,6 +3,7 @@ import { CustomError } from '../../../domain/errors/custom.error.js';
 import { AuthenticatedRequest } from '../../../domain/interfaces/authenticatesRequest.interface.js';
 import { CreateUserDto } from '../../../domain/Dtos/users/createUser.Dtos.js';
 import { UserService } from '../../services/user.service.js';
+import { UpdateUserDto } from '../../../domain/Dtos/users/updateUser.dto.js';
 
 export class UserController{
   constructor(public readonly userService: UserService){}
@@ -34,7 +35,15 @@ export class UserController{
   };
 
   public updateUser = async (req: AuthenticatedRequest, res: Response) => {
-    throw 'Implement';
+    const id = +req.params.id;
+
+    const [error, updateUserDto] = UpdateUserDto.create({ ...req.body, id });
+    if (error) return res.status(400).json({ ok: false, error });
+
+    // Pasa updateUserDto al servicio
+    this.userService.updateUser(updateUserDto!)
+      .then((data) => res.status(200).json({ ok: true, data }))
+      .catch((error) => this.handleError(error, res));
   };
 
 }

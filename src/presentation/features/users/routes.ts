@@ -21,7 +21,7 @@ export class UserRouter{
 
     router.get('/', controller.getAllUsers);
     router.post('/', controller.createUser);
-    //router.put('/:id', controller.updateUser);
+    router.put('/:id', controller.updateUser);
 
     return router;
   }
