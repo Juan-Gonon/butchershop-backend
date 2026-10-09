@@ -13,7 +13,7 @@ export const getTenantCarniceriaId = (
   const userRoleId = Number(req.user.id_rol);
 
   // Si es Super Admin y envió un id_carniceria explícito en el body/query
-  if (userRoleId === Role.ADMIN && bodyCarniceriaId) {
+  if (userRoleId === Role.SUPER_ADMIN && bodyCarniceriaId) {
     return Number(bodyCarniceriaId);
   }
 

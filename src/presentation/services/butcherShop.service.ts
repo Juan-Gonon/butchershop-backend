@@ -27,7 +27,7 @@ export class ButcherShopService{
     } catch (error) {
       if(error instanceof CustomError) throw error;
 
-      CustomError.internalServer();
+      throw CustomError.internalServer();
     }
 
   }
