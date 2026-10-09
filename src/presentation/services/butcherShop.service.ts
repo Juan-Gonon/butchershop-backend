@@ -38,9 +38,9 @@ export class ButcherShopService{
 
   }
 
-  public async findByIdButcherShop(id: number){
+  public async findByIdButcherShop(id: string){
     return await prisma.carnicerias.findUnique({
-      where: { id: BigInt(id) }
+      where: { uuid: id}
     });
   }
 
@@ -62,12 +62,15 @@ export class ButcherShopService{
         data: {
           nombre,
           telefono_whatsapp,
-          direccion,
+          direccion: direccion || null,
           activo: true
         }
       });
 
-      return newCarniceria;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const {id, ...carniceriaEntity} = newCarniceria;
+
+      return carniceriaEntity;
     } catch (error) {
       if (error instanceof CustomError) throw error;
       throw CustomError.internalServer();
