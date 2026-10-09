@@ -4,7 +4,7 @@ import { Role } from '../../domain/types/roles.enums.js';
 
 export const getTenantCarniceriaId = (
   req: AuthenticatedRequest, 
-  bodyCarniceriaId?: number | string
+  targetCarniceriaId?: number | string
 ): number => {
   if (!req.user) {
     throw CustomError.internalServer('Se requiere autenticación para determinar la carnicería');
@@ -12,11 +12,15 @@ export const getTenantCarniceriaId = (
 
   const userRoleId = Number(req.user.id_rol);
 
-  // Si es Super Admin y envió un id_carniceria explícito en el body/query
-  if (userRoleId === Role.SUPER_ADMIN && bodyCarniceriaId) {
-    return Number(bodyCarniceriaId);
+  if (userRoleId === Role.SUPER_ADMIN && targetCarniceriaId) {
+    const parsedId = Number(targetCarniceriaId);
+    
+    if (isNaN(parsedId) || parsedId <= 0) {
+      throw CustomError.badRequest('El ID de la carnicería debe ser un número válido');
+    }
+    
+    return parsedId;
   }
 
-  // Para cualquier otro usuario, se garantiza la carnicería de su JWT
   return Number(req.user.id_carniceria);
 };

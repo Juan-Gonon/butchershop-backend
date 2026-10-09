@@ -1,10 +1,11 @@
 import { Response, NextFunction } from 'express';
 import { AuthenticatedRequest } from '../../domain/interfaces/authenticatesRequest.interface.js';
 import { CustomError } from '../../domain/errors/custom.error.js';
+import { Role } from '../../domain/types/roles.enums.js';
 
 export class RoleMiddleware {
 
-  static authorizeRoles(...allowedRoleIds: number[]) {
+  static authorizeRoles(...allowedRoleIds: Role[]) {
     return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
       try {
         if (!req.user) {
