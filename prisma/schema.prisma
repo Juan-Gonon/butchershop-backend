@@ -15,6 +15,7 @@ model carnicerias {
   direccion                    String?
   activo                       Boolean                        @default(true)
   fecha_creacion               DateTime                       @default(now()) @db.Timestamptz(6)
+  uuid                         String                         @unique @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   clientes                     clientes[]
   direcciones_envio_carniceria direcciones_envio_carniceria[]
   pedidos                      pedidos[]
