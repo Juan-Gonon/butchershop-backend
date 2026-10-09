@@ -6,6 +6,35 @@ import { Role } from '../../domain/types/roles.enums.js';
 
 export class UserService{
 
+  public async getAllusers(){
+    try {
+      const users = prisma.usuarios.findMany({
+        include: {
+          carnicerias: {
+            select: {
+              nombre: true
+            }
+          },
+          roles: {
+            select: {
+              nombre: true
+            }
+          }
+        },
+        omit: {
+          password_hash: true
+        }
+      });
+      
+      return users;
+      
+    } catch (error) {
+      if (error instanceof CustomError) throw error;
+
+      throw CustomError.internalServer();
+    }
+  }
+  
   public async CreateUser(createUserDto: CreateUserDto, creatorRoleId: number){
     const {nombre, usuario, password, id_carniceria, id_rol, email } = createUserDto;
     const targetRolId = Number(id_rol);

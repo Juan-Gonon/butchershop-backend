@@ -16,7 +16,9 @@ export class UserController{
   };
 
   public getAllUsers = async (req: AuthenticatedRequest, res: Response) => {
-    throw 'implemnt';
+    this.userService.getAllusers()
+      .then((data) => res.status(201).json({ok: true, data}))
+      .catch((error) => this.handleError(error, res));
   };
 
   public createUser = async(req: AuthenticatedRequest, res: Response) => {

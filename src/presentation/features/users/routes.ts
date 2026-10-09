@@ -19,7 +19,7 @@ export class UserRouter{
     // Solo SUPER_ADMIN y ADMIN pueden administrar usuarios
     router.use(RoleMiddleware.authorizeRoles(Role.SUPER_ADMIN, Role.ADMIN));
 
-    //router.get('/', controller.getAllUsers);
+    router.get('/', controller.getAllUsers);
     router.post('/', controller.createUser);
     //router.put('/:id', controller.updateUser);
 
