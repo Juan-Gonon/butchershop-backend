@@ -4,6 +4,7 @@ import { prisma } from '../../data/postgres/index.js';
 import { AuthenticatedRequest } from '../../domain/interfaces/authenticatesRequest.interface.js';
 import { JwtPayload } from '../../domain/interfaces/jwtPayload.interface.js';
 import { CustomError } from '../../domain/errors/custom.error.js';
+import { Role } from '../../domain/types/roles.enums.js';
 
 export class AuthMiddleware {
 
@@ -31,7 +32,11 @@ export class AuthMiddleware {
       if (!user.activo) throw CustomError.unauthorized('Inactive user');
 
       // Inyectar el payload validado en la Request
-      req.user = payload;
+      req.user = {
+        id: Number(user.id),
+        id_carniceria: Number(user.id_carniceria),
+        id_rol: Number(user.id_rol) as Role
+      };
 
       // Continuar al siguiente handler/controlador
       next();
