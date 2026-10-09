@@ -73,7 +73,7 @@ export class ButcherShopService{
 
     try {
       // Verificar si existe la carnicería
-      const existCarniceria = this.findByIdButcherShop(id);
+      const existCarniceria = await this.findByIdButcherShop(id);
 
       if (!existCarniceria) {
         throw CustomError.notFound(`Carnicería con ID ${id} no encontrada`);
@@ -89,7 +89,7 @@ export class ButcherShopService{
         });
 
         if (duplicate) {
-          throw CustomError.badRequest(`Ya existe otra carnicería con el nombre "${dataToUpdate.nombre}"`);
+          throw CustomError.badRequest(`Ya existe otra carnicería con el nombre '${dataToUpdate.nombre}'`);
         }
       }
 

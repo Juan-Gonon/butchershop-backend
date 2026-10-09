@@ -26,7 +26,7 @@ export class UpdateButcherShop {
         nombre ? nombre.trim() : undefined,
         telefono_whatsapp ? String(telefono_whatsapp).trim() : undefined,
         direccion ? direccion.trim() : undefined,
-        activo !== undefined ? Boolean(activo) : undefined
+        activo !== undefined ? (activo === true || activo === 'true') : undefined
       )
     ];
   }

@@ -17,8 +17,7 @@ export class ButcherShopRouter {
 
     router.get('/', controller.getAllButcherShop);
     router.post('/', controller.createButcherShop);
-    router.put('/', controller.updateButcherShop);
-    router.delete('/', controller.deleteButcherShop);
+    router.put('/:id', controller.updateButcherShop);
 
     return router;
   }
