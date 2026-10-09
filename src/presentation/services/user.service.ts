@@ -41,9 +41,9 @@ export class UserService{
     }
   }
 
-  public async findByIdUser(id: number){
+  public async findByIdUser(id: string){
     return await prisma.usuarios.findUnique({
-      where: { id: BigInt(id) }
+      where: { uuid: id }
     });
   }
   
@@ -115,13 +115,15 @@ export class UserService{
   }
 
   public async updateUser(updateUserDto: UpdateUserDto) {
-    const { id, password, id_carniceria, id_rol, ...restData } = updateUserDto;
+    const { id: uuid, password, id_carniceria, id_rol, ...restData } = updateUserDto;
 
     try {
     // Verificar si el usuario existe
-      const existUser = await this.findByIdUser(id);
+  
+      const existUser = await this.findByIdUser(uuid);
+  
       if (!existUser) {
-        throw CustomError.notFound(`Usuario con ID ${id} no encontrado`);
+        throw CustomError.notFound(`Usuario con ID ${uuid} no encontrado`);
       }
 
       // Verificar duplicados de nombre de usuario
@@ -129,7 +131,7 @@ export class UserService{
         const duplicate = await prisma.usuarios.findFirst({
           where: {
             usuario: { equals: restData.usuario, mode: 'insensitive' },
-            NOT: { id: BigInt(id) }
+            NOT: { uuid }
           }
         });
 
@@ -158,13 +160,13 @@ export class UserService{
 
       // Actualizar en la BD
       const updatedUser = await prisma.usuarios.update({
-        where: { id: BigInt(id) },
+        where: { uuid },
         data: dataToPrisma
       });
 
       // Excluir el password_hash de la respuesta
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { password_hash, ...userEntity } = updatedUser;
+      const { id, password_hash, ...userEntity } = updatedUser;
 
       return userEntity;
 

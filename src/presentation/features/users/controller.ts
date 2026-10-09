@@ -35,9 +35,10 @@ export class UserController{
   };
 
   public updateUser = async (req: AuthenticatedRequest, res: Response) => {
-    const id = +req.params.id;
+    const id = req.params.id;
 
     const [error, updateUserDto] = UpdateUserDto.create({ ...req.body, id });
+  
     if (error) return res.status(400).json({ ok: false, error });
 
     // Pasa updateUserDto al servicio
