@@ -29,13 +29,14 @@ export class AuthController {
 
   };
 
-  public createUser = async(req: Request, res: Response) => {
+  public createUser = async(req: AuthenticatedRequest, res: Response) => {
+    const creatorRoleId = Number(req.user!.id_rol);
     const [error, createUserDto] = CreateUserDto.create(req.body);
 
     if(error) return res.status(400).json({ok: false, error});
 
     this.authService
-      .CreateUser(createUserDto!)
+      .CreateUser(createUserDto!, creatorRoleId)
       .then((user) => res.status(201).json({ok: true, user}))
       .catch((error) => this.handleError(error, res));
   };

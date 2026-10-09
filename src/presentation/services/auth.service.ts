@@ -4,6 +4,7 @@ import { prisma } from '../../data/postgres/index.js';
 import { CreateUserDto } from '../../domain/Dtos/users/createUser.Dtos.js';
 import { LoginUserDto } from '../../domain/Dtos/users/loginUser.Dtos.js';
 import { CustomError } from '../../domain/errors/custom.error.js';
+import { Role } from '../../domain/types/roles.enums.js';
 
 export class AuthService{
   //constructor(){}
@@ -89,10 +90,20 @@ export class AuthService{
     }
   }
 
-  public async CreateUser(createUserDto: CreateUserDto){
+  public async CreateUser(createUserDto: CreateUserDto, creatorRoleId: number){
     const {nombre, usuario, password, id_carniceria, id_rol, email } = createUserDto;
-     
+    const targetRolId = Number(id_rol);
     try {
+
+      // Si intenta asignar SUPER_ADMIN, el creador DEBE ser SUPER_ADMIN
+      if (targetRolId === Role.SUPER_ADMIN && creatorRoleId !== Role.SUPER_ADMIN) {
+        throw CustomError.forbidden('No tienes permisos para asignar el rol de Super Admin');
+      }
+
+      // Un ADMIN no puede asignarse roles de igual o mayor jerarquía que el suyo o crear Super Admins
+      if (creatorRoleId !== Role.SUPER_ADMIN && targetRolId <= creatorRoleId) {
+        throw CustomError.forbidden('No puedes crear usuarios con un rol igual o superior al tuyo');
+      }
       const [existUser, existCarniceria, existRol] = await Promise.all([
         prisma.usuarios.findUnique({
           where: {usuario}
