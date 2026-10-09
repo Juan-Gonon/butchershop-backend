@@ -10,7 +10,15 @@ export class UserService{
   public async getAllusers(){
     try {
       const users = prisma.usuarios.findMany({
-        include: {
+        select: {
+          uuid: true, 
+          nombre: true,
+          usuario: true,
+          email: true,
+          activo: true,
+          fecha_creacion: true,
+          id_carniceria: true, 
+          id_rol: true,
           carnicerias: {
             select: {
               nombre: true
@@ -21,9 +29,6 @@ export class UserService{
               nombre: true
             }
           }
-        },
-        omit: {
-          password_hash: true
         }
       });
       
