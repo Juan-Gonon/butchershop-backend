@@ -103,7 +103,7 @@ export class UserService{
       });
 
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const {password_hash, ...userEntity} = user;
+      const {id, password_hash, ...userEntity} = user;
 
       return userEntity;
       
