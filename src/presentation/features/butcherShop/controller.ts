@@ -34,7 +34,7 @@ export class ButcherShopController{
       .catch((error) => this.handleError(error, res));
   };
   public updateButcherShop = async (req: AuthenticatedRequest, res: Response) => {
-    const id = +req.params.id;
+    const id = req.params.id;
    
     const [error, updateButcher] = UpdateButcherShop.create({...req.body, id});
   

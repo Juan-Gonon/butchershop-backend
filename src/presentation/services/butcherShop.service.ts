@@ -38,9 +38,9 @@ export class ButcherShopService{
 
   }
 
-  public async findByIdButcherShop(id: string){
+  public async findByIdButcherShop(uuid: string){
     return await prisma.carnicerias.findUnique({
-      where: { uuid: id}
+      where: { uuid }
     });
   }
 
@@ -78,14 +78,14 @@ export class ButcherShopService{
   }
 
   public async updateButcherShop(updateDto: UpdateButcherShop) {
-    const { id, ...dataToUpdate } = updateDto;
+    const { id: uuid, ...dataToUpdate } = updateDto;
 
     try {
       // Verificar si existe la carnicería
-      const existCarniceria = await this.findByIdButcherShop(id);
+      const existCarniceria = await this.findByIdButcherShop(uuid);
 
       if (!existCarniceria) {
-        throw CustomError.notFound(`Carnicería con ID ${id} no encontrada`);
+        throw CustomError.notFound(`Carnicería con ID ${uuid} no encontrada`);
       }
 
       // Si intenta actualizar el nombre, verificar que no duplique a otra
@@ -93,7 +93,7 @@ export class ButcherShopService{
         const duplicate = await prisma.carnicerias.findFirst({
           where: {
             nombre: { equals: dataToUpdate.nombre, mode: 'insensitive' },
-            NOT: { id: BigInt(id)}
+            NOT: { uuid }
           }
         });
 
@@ -104,13 +104,16 @@ export class ButcherShopService{
 
       // 3. Actualizar registro en la BD
       const updatedCarniceria = await prisma.carnicerias.update({
-        where: { id: BigInt(id) },
+        where: { uuid },
         data: {
           ...dataToUpdate
         }
       });
 
-      return updatedCarniceria;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { id, ...carniceriaEntity } = updatedCarniceria;
+
+      return carniceriaEntity;
     } catch (error) {
       if (error instanceof CustomError) throw error;
       throw CustomError.internalServer();
