@@ -24,7 +24,7 @@ export class Server {
     this.allowedOrigins = allowedOrigins;
 
     this.app.set('json replacer', (_key: string, value: unknown) =>
-      typeof value === 'bigint' ? Number(value) : value
+      typeof value === 'bigint' ? value.toString() : value
     );
   }
 

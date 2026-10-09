@@ -14,7 +14,7 @@ export class AuthRouter{
 
     router.post('/' ,[loginLimiter], controller.loginUser);
 
-    router.post('/new', controller.createUser);
+    router.post('/new',[AuthMiddleware.validateJWT],  controller.createUser);
 
     router.get('/renew', [AuthMiddleware.validateJWT],  controller.renewToken);
 

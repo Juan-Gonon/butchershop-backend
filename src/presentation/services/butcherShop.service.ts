@@ -34,7 +34,7 @@ export class ButcherShopService{
 
   public async findByIdButcherShop(id: number){
     return await prisma.carnicerias.findUnique({
-      where: { id }
+      where: { id: BigInt(id) }
     });
   }
 
@@ -84,7 +84,7 @@ export class ButcherShopService{
         const duplicate = await prisma.carnicerias.findFirst({
           where: {
             nombre: { equals: dataToUpdate.nombre, mode: 'insensitive' },
-            NOT: { id }
+            NOT: { id: BigInt(id)}
           }
         });
 
@@ -95,7 +95,7 @@ export class ButcherShopService{
 
       // 3. Actualizar registro en la BD
       const updatedCarniceria = await prisma.carnicerias.update({
-        where: { id },
+        where: { id: BigInt(id) },
         data: {
           ...dataToUpdate
         }
