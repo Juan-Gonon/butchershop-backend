@@ -192,6 +192,7 @@ model usuarios {
   fecha_creacion DateTime    @default(now()) @db.Timestamptz(6)
   id_rol         BigInt
   usuario        String?     @unique @db.VarChar(50)
+  uuid           String      @unique @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   carnicerias    carnicerias @relation(fields: [id_carniceria], references: [id], onDelete: Cascade, map: "fk_usuarios_carniceria")
   roles          roles       @relation(fields: [id_rol], references: [id], map: "fk_usuarios_rol")
 }

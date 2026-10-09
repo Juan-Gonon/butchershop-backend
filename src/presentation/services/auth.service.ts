@@ -24,7 +24,7 @@ export class AuthService{
       if(!isMatching) throw CustomError.badRequest('Credenciales no válidas');
 
       const token = await JwtAdapter.generateToken({
-        id: Number(user.id),
+        uuid: user.uuid,
         id_carniceria: Number(user.id_carniceria),
         id_rol: Number(user.id_rol)
       });
@@ -34,7 +34,7 @@ export class AuthService{
       }
 
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { password_hash, ...userEntity } = user;
+      const { id, password_hash, ...userEntity } = user;
 
       return {
         user: userEntity,
@@ -48,10 +48,10 @@ export class AuthService{
 
   }
 
-  public async renewToken(userId: number | string) {
+  public async renewToken(userUuid: string) {
     try {
       const user = await prisma.usuarios.findUnique({
-        where: { id: BigInt(userId) }
+        where: { uuid: userUuid }
       });
 
       if (!user) {
@@ -64,7 +64,7 @@ export class AuthService{
 
       // Generar un nuevo JWT
       const token = await JwtAdapter.generateToken({
-        id: Number(user.id),
+        uuid: user.uuid,
         id_carniceria: Number(user.id_carniceria),
         id_rol: Number(user.id_rol)
       });
@@ -75,7 +75,7 @@ export class AuthService{
 
       // Excluir el password_hash
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { password_hash, ...userEntity } = user;
+      const { id, password_hash, ...userEntity } = user;
 
       return {
         user: userEntity,

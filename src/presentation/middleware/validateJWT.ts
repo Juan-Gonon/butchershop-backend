@@ -25,7 +25,7 @@ export class AuthMiddleware {
 
       // Verificar en la BD si el usuario existe y está activo
       const user = await prisma.usuarios.findUnique({
-        where: { id: BigInt(payload.id) }
+        where: { uuid: payload.uuid }
       });
 
       if (!user) throw CustomError.unauthorized('Invalid token - user does not exist in the system');
@@ -33,7 +33,7 @@ export class AuthMiddleware {
 
       // Inyectar el payload validado en la Request
       req.user = {
-        id: Number(user.id),
+        uuid: user.uuid,
         id_carniceria: Number(user.id_carniceria),
         id_rol: Number(user.id_rol) as Role
       };

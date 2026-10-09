@@ -30,10 +30,10 @@ export class AuthController {
 
   public renewToken = async (req: AuthenticatedRequest, res: Response) => {
     // req.user fue inyectado de forma segura por el AuthMiddleware
-    const userId = req.user!.id;
+    const userUuid = req.user!.uuid;
 
     this.authService
-      .renewToken(userId)
+      .renewToken(userUuid)
       .then((data) => res.json({ ok: true, ...data }))
       .catch((error) => this.handleError(error, res));
   };
