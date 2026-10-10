@@ -44,6 +44,7 @@ model clientes {
   direccion_defecto String?
   es_generico       Boolean     @default(false)
   fecha_registro    DateTime    @default(now()) @db.Timestamptz(6)
+  uuid              String      @unique @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   carnicerias       carnicerias @relation(fields: [id_carniceria], references: [id], onDelete: Cascade, map: "fk_clientes_carniceria")
   pedidos           pedidos[]
 
@@ -102,6 +103,7 @@ model pedidos {
   canal_origen                 String                        @default("pos") @db.VarChar(30)
   fecha                        DateTime                      @default(now()) @db.Timestamptz(6)
   total                        Decimal                       @default(0) @db.Decimal(10, 2)
+  uuid                         String                        @unique @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   detalle_pedidos              detalle_pedidos[]
   carnicerias                  carnicerias                   @relation(fields: [id_carniceria], references: [id], onDelete: Cascade, map: "fk_pedidos_carniceria")
   clientes                     clientes                      @relation(fields: [id_cliente], references: [id], map: "fk_pedidos_cliente")
@@ -121,6 +123,7 @@ model productos_carniceria {
   disponible           Boolean            @default(true)
   maneja_inventario    Boolean            @default(false)
   stock_actual         Decimal?           @db.Decimal(10, 2)
+  uuid                 String             @unique @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   detalle_pedidos      detalle_pedidos[]
   carnicerias          carnicerias        @relation(fields: [id_carniceria], references: [id], onDelete: Cascade, map: "fk_productos_carniceria")
   unidades_venta       unidades_venta     @relation(fields: [id_unidad_venta], references: [id], map: "fk_productos_carniceria_unidad")
@@ -137,6 +140,7 @@ model productos_catalogo {
   id_unidad_venta_defecto BigInt
   descripcion_general     String?
   imagen_url              String?                @db.VarChar(500)
+  uuid                    String                 @unique @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   productos_carniceria    productos_carniceria[]
   categorias              categorias             @relation(fields: [id_categoria], references: [id], map: "fk_catalogo_categoria")
   unidades_venta          unidades_venta         @relation(fields: [id_unidad_venta_defecto], references: [id], map: "fk_catalogo_unidad_defecto")
