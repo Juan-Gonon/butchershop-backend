@@ -20,7 +20,6 @@ model carnicerias {
   direcciones_envio_carniceria direcciones_envio_carniceria[]
   pedidos                      pedidos[]
   productos_carniceria         productos_carniceria[]
-  tipos_preparacion            tipos_preparacion[]
   usuarios                     usuarios[]
 }
 
@@ -170,11 +169,10 @@ model tipos_entrega {
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model tipos_preparacion {
   id              BigInt            @id @default(autoincrement())
-  id_carniceria   BigInt?
-  nombre          String            @db.VarChar(100)
+  nombre          String            @unique(map: "uq_tipos_preparacion_nombre") @db.VarChar(100)
   descripcion     String?
+  activo          Boolean           @default(true)
   detalle_pedidos detalle_pedidos[]
-  carnicerias     carnicerias?      @relation(fields: [id_carniceria], references: [id], onDelete: Cascade, map: "fk_preparacion_carniceria")
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
