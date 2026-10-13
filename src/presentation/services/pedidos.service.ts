@@ -4,29 +4,35 @@ import { VolumenPorUnidad } from '../../domain/interfaces/pedidos.interface.js';
 
 export class PedidoService {
 
-  public async getMetrics(uuid: string, id_carniceria: number, filtro: string){
-    try {
-      // fechas de inicio y fin basadas en el filtro
-      const ahora = new Date();
-      const fechaInicio = new Date();
-      let fechaFin = null;
+  private calculateDate(filtro: string) {
 
-      if (filtro === 'ayer') {
-        // Restamos 1 día de forma segura
-        fechaInicio.setDate(ahora.getDate() - 1);
-        fechaInicio.setHours(0, 0, 0, 0);
-        
-        fechaFin = new Date(fechaInicio);
-        fechaFin.setHours(23, 59, 59, 999);
-      } else {
-        // Por defecto es 'hoy'
-        fechaInicio.setHours(0, 0, 0, 0);
-        
-        fechaFin = new Date();
-        fechaFin.setHours(23, 59, 59, 999);
-      }
+    const filtroLimpio = ['hoy', 'ayer'].includes(filtro) ? filtro : 'hoy';
 
-      const resultado = await prisma.$queryRaw<VolumenPorUnidad[]>`
+    const ahora = new Date();
+    const fechaInicio = new Date();
+    let fechaFin: Date;
+
+    if (filtroLimpio === 'ayer') {
+      fechaInicio.setDate(ahora.getDate() - 1);
+      fechaInicio.setHours(0, 0, 0, 0);
+        
+      fechaFin = new Date(fechaInicio);
+      fechaFin.setHours(23, 59, 59, 999);
+    } else {
+      fechaInicio.setHours(0, 0, 0, 0);
+        
+      fechaFin = new Date();
+      fechaFin.setHours(23, 59, 59, 999);
+    }
+
+    return {
+      fechaInicio,
+      fechaFin
+    };
+  }
+
+  private async getVolumenDesp(fechaInicio:Date, fechaFin:Date, id_carniceria:number){
+    return await prisma.$queryRaw<VolumenPorUnidad[]>`
         SELECT 
             u.nombre AS unidad_venta,
             u.abreviatura,
@@ -42,12 +48,43 @@ export class PedidoService {
         GROUP BY u.id, u.nombre, u.abreviatura;
       `;
 
+  }
+
+  private async getTotalBilling(fechaInicio:Date, fechaFin:Date, id_carniceria:number){
+    const resultado = await prisma.pedidos.aggregate({
+      _sum: {
+        total: true // Suma el campo total de los pedidos
+      },
+      where: {
+        id_carniceria: id_carniceria,
+        id_estado: 5, // Entregado
+        fecha: {
+          gte: fechaInicio,
+          lte: fechaFin
+        }
+      }
+    });
+
+    return resultado._sum.total || 0;
+  }
+
+  public async getMetrics(uuid: string, id_carniceria: number, filtro: string){
+    try {
+
+      const {fechaInicio, fechaFin } = this.calculateDate(filtro);
+
+      const [volume, total ] = await Promise.all([
+        this.getVolumenDesp(fechaInicio, fechaFin, id_carniceria),
+        this.getTotalBilling(fechaInicio, fechaFin, id_carniceria)
+      ]);
+
       return {
         id_carniceria,
         filtro_aplicado: filtro,
         desde: fechaInicio,
         hasta: fechaFin,
-        result: resultado
+        volume,
+        total
       };
       
     } catch (error) {
