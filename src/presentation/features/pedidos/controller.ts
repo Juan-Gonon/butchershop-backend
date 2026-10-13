@@ -13,17 +13,17 @@ export class PedidosController{
 
     const { uuid, id_carniceria, id_rol } = req.user;
 
-    // 2. Validar los campos individuales
+    // 1. Validar los campos individuales
     if(!uuid) return res.status(400).json({ok: false, error: 'Invalid data: missing uuid'});
     if(!id_carniceria) return res.status(400).json({ok: false, error: 'Invalid data: missing id_carniceria'});
     if(!id_rol) return res.status(400).json({ok: false, error: 'Invalid data: missing id_rol'});
 
     const idCarniceria = getTenantCarniceriaId(req, id_carniceria);
 
-    this.pedidoService.getMetrics(uuid, idCarniceria)
-      .then((data) => res.status(201).json({ok: true, data}))
-      .catch((error) => res.status(400).json({ok: false, error}));
+    const filtro = (req.query.filtro as string) || 'hoy';
 
-    //res.json({ok: true, uuid, id_carniceria, id_rol, idCarniceria});
+    this.pedidoService.getMetrics(uuid, idCarniceria, filtro)
+      .then((data) => res.status(200).json({ok: true, data})) // Usar 200 para consultas GET exitosas
+      .catch((error) => res.status(400).json({ok: false, error}));
   };
 }
