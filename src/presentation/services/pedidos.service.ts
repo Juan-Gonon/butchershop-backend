@@ -1,6 +1,7 @@
 import { prisma } from '../../data/postgres/index.js';
 import { CustomError } from '../../domain/errors/custom.error.js';
 import { VolumenPorUnidad } from '../../domain/interfaces/pedidos.interface.js';
+import { StatePedido } from '../../domain/types/statePedidos.enum.js';
 
 export class PedidoService {
 
@@ -42,7 +43,7 @@ export class PedidoService {
         INNER JOIN productos_carniceria pc ON dp.id_producto_carniceria = pc.id
         INNER JOIN unidades_venta u ON pc.id_unidad_venta = u.id
         WHERE p.id_carniceria = ${id_carniceria}
-          AND p.id_estado = 5
+          AND p.id_estado = ${StatePedido.ENTREGADO}
           AND p.fecha >= ${fechaInicio}
           AND p.fecha <= ${fechaFin}
         GROUP BY u.id, u.nombre, u.abreviatura;
@@ -57,7 +58,7 @@ export class PedidoService {
       },
       where: {
         id_carniceria: id_carniceria,
-        id_estado: 5, // Entregado
+        id_estado: StatePedido.ENTREGADO, // Entregado
         fecha: {
           gte: fechaInicio,
           lte: fechaFin
@@ -75,7 +76,7 @@ export class PedidoService {
       },
       where: {
         id_carniceria: id_carniceria,
-        id_estado: 3,
+        id_estado: StatePedido.EN_PREPARACION,
         fecha: {
           gte: fechaInicio,
           lte: fechaFin
@@ -93,7 +94,7 @@ export class PedidoService {
       },
       where: {
         id_carniceria: id_carniceria,
-        id_estado: 2,
+        id_estado: StatePedido.CONFIRMADO,
         fecha: {
           gte: fechaInicio,
           lte: fechaFin
