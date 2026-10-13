@@ -86,15 +86,34 @@ export class PedidoService {
     return resultado._count.id || 0;
   }
 
+  private async getQuantityConfirmed(fechaInicio:Date, fechaFin:Date, id_carniceria:number){
+    const resultado = await prisma.pedidos.aggregate({
+      _count: {
+        id: true
+      },
+      where: {
+        id_carniceria: id_carniceria,
+        id_estado: 2,
+        fecha: {
+          gte: fechaInicio,
+          lte: fechaFin
+        }
+      }
+    });
+
+    return resultado._count.id || 0;
+  }
+
   public async getMetrics(uuid: string, id_carniceria: number, filtro: string){
     try {
 
       const {fechaInicio, fechaFin } = this.calculateDate(filtro);
 
-      const [volume, total, quantity ] = await Promise.all([
+      const [volume, total, quantityPreparation, quantityConfirmed ] = await Promise.all([
         this.getVolumenDesp(fechaInicio, fechaFin, id_carniceria),
         this.getTotalBilling(fechaInicio, fechaFin, id_carniceria),
-        this.getQuantityPreparation(fechaInicio, fechaFin, id_carniceria)
+        this.getQuantityPreparation(fechaInicio, fechaFin, id_carniceria),
+        this.getQuantityConfirmed(fechaInicio, fechaFin, id_carniceria)
       ]);
 
       return {
@@ -104,7 +123,8 @@ export class PedidoService {
         hasta: fechaFin,
         volume,
         total,
-        quantity
+        quantityPreparation,
+        quantityConfirmed
       };
       
     } catch (error) {
