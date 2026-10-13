@@ -1,8 +1,10 @@
 import { Response } from 'express';
 import { AuthenticatedRequest } from '../../../domain/interfaces/authenticatesRequest.interface.js';
 import { getTenantCarniceriaId } from '../../shared/get.tenant.js';
+import { PedidoService } from '../../services/pedidos.service.js';
 
 export class PedidosController{
+  constructor(private readonly pedidoService: PedidoService){}
 
   public metrics = async (req: AuthenticatedRequest, res: Response) => {
     if (!req.user) {
@@ -18,6 +20,10 @@ export class PedidosController{
 
     const idCarniceria = getTenantCarniceriaId(req, id_carniceria);
 
-    res.json({ok: true, uuid, id_carniceria, id_rol, idCarniceria});
+    this.pedidoService.getMetrics(uuid, idCarniceria)
+      .then((data) => res.status(201).json({ok: true, data}))
+      .catch((error) => res.status(400).json({ok: false, error}));
+
+    //res.json({ok: true, uuid, id_carniceria, id_rol, idCarniceria});
   };
 }
