@@ -207,4 +207,65 @@ export class PedidoService {
     }
   }
 
+  public async getLivePedidos(id_carniceria: number) {
+    try {
+      const pedidosLive = await prisma.pedidos.findMany({
+        where: {
+          id_carniceria,
+          id_estado: {
+            in: [StatePedido.CONFIRMADO, StatePedido.EN_PREPARACION, StatePedido.EN_CAMINO] 
+          }
+        },
+        include: {
+          clientes: {
+            select: { nombre: true, telefono: true }
+          },
+          estados_pedido: {
+            select: { nombre: true }
+          },
+          tipos_entrega: {
+            select: { nombre: true }
+          },
+          detalle_pedidos: {
+            include: {
+              productos_carniceria: {
+                include: {
+                  productos_catalogo: { select: { nombre: true } },
+                  unidades_venta: { select: { abreviatura: true } }
+                }
+              },
+              tipos_preparacion: { select: { nombre: true, descripcion: true } }
+            }
+          }
+        },
+        orderBy: {
+          fecha: 'asc' 
+        },
+        take: 10
+      });
+     
+      return pedidosLive.map(p => ({
+        uuid: p.uuid,
+        id_pedido: p.id.toString(),
+        cliente: p.clientes.nombre,
+        canal_origen: p.canal_origen,
+        tipo_entrega: p.tipos_entrega.nombre,
+        estado: p.estados_pedido.nombre,
+        fecha: p.fecha,
+        total: p.total.toString(),
+        detalles: p.detalle_pedidos.map(dp => ({
+          cantidad: dp.cantidad.toString(),
+          unidad: dp.productos_carniceria.unidades_venta.abreviatura,
+          producto: dp.productos_carniceria.productos_catalogo.nombre,
+          preparacion: dp.tipos_preparacion?.nombre || null,
+          observaciones: dp.observaciones
+        }))
+      }));
+
+    } catch (error) {
+      if (error instanceof CustomError) throw error;
+      throw CustomError.internalServer();
+    }
+  }
+
 }
