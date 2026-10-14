@@ -1,29 +1,36 @@
 import { prisma } from '../../data/postgres/index.js';
 import { CustomError } from '../../domain/errors/custom.error.js';
-import { VolumenPorUnidad } from '../../domain/interfaces/pedidos.interface.js';
+import { VolumenPorTipoCarne, VolumenPorUnidad } from '../../domain/interfaces/pedidos.interface.js';
 import { StatePedido } from '../../domain/types/statePedidos.enum.js';
 
 export class PedidoService {
 
-  private calculateDate(filtro: string) {
-
-    const filtroLimpio = ['hoy', 'ayer'].includes(filtro) ? filtro : 'hoy';
+  private calculateDateRange(periodo: string) {
+    const periodoLimpio = ['hoy', 'ayer', 'semana', 'mes'].includes(periodo) ? periodo : 'hoy';
 
     const ahora = new Date();
     const fechaInicio = new Date();
-    let fechaFin: Date;
+    let fechaFin = new Date();
 
-    if (filtroLimpio === 'ayer') {
+    fechaFin.setHours(23, 59, 59, 999); // El fin siempre es el final del día actual
+
+    if (periodoLimpio === 'ayer') {
       fechaInicio.setDate(ahora.getDate() - 1);
       fechaInicio.setHours(0, 0, 0, 0);
-        
+      
       fechaFin = new Date(fechaInicio);
       fechaFin.setHours(23, 59, 59, 999);
-    } else {
+    } else if (periodoLimpio === 'semana') {
+      // Últimos 7 días incluyendo hoy
+      fechaInicio.setDate(ahora.getDate() - 6);
       fechaInicio.setHours(0, 0, 0, 0);
-        
-      fechaFin = new Date();
-      fechaFin.setHours(23, 59, 59, 999);
+    } else if (periodoLimpio === 'mes') {
+      // Primer día del mes actual o últimos 30 días (aquí usamos el primer día del mes actual)
+      fechaInicio.setDate(1);
+      fechaInicio.setHours(0, 0, 0, 0);
+    } else {
+      // Por defecto 'hoy'
+      fechaInicio.setHours(0, 0, 0, 0);
     }
 
     return {
@@ -108,7 +115,7 @@ export class PedidoService {
   public async getMetrics(uuid: string, id_carniceria: number, filtro: string){
     try {
 
-      const {fechaInicio, fechaFin } = this.calculateDate(filtro);
+      const {fechaInicio, fechaFin } = this.calculateDateRange(filtro);
 
       const [volume, total, quantityPreparation, quantityConfirmed ] = await Promise.all([
         this.getVolumenDesp(fechaInicio, fechaFin, id_carniceria),
@@ -134,33 +141,70 @@ export class PedidoService {
       CustomError.internalServer();
     }
   }
-
   public async getVolumenDespachoPorTipoCarne(id_carniceria: number, periodo: string, unidad: string) {
-    // 1. Calcular rangos de fecha según sea 'hoy', 'semana' o 'mes'
-    const { fechaInicio, fechaFin } = this.calculateDate(periodo);
+    try {
+      const { fechaInicio, fechaFin } = this.calculateDateRange(periodo);
 
-    // 2. Consulta SQL para agrupar por Tipo de Carne
-    const resultado = await prisma.$queryRaw`
-      SELECT 
-        tc.id AS tipo_carne_id,
-        tc.nombre AS tipo_carne_nombre,
-        SUM(dp.cantidad) AS total_libras
-      FROM pedidos p
-      INNER JOIN detalle_pedidos dp ON p.id = dp.id_pedido
-      INNER JOIN productos_carniceria pc ON dp.id_producto_carniceria = pc.id
-      INNER JOIN productos_catalogo cat ON pc.id_producto_catalogo = cat.id
-      INNER JOIN categorias c ON cat.id_categoria = c.id
-      INNER JOIN tipos_carne tc ON c.id_tipo_carne = tc.id
-      WHERE p.id_carniceria = ${id_carniceria}
-        AND p.id_estado = 5 -- 5 es ENTREGADO según tu BD
-        AND p.fecha >= ${fechaInicio}
-        AND p.fecha <= ${fechaFin}
-      GROUP BY tc.id, tc.nombre;
-    `;
+      // Ejecutar consulta SQL agrupada por Tipo de Carne
+      const resultado = await prisma.$queryRaw<VolumenPorTipoCarne[]>`
+        SELECT 
+            tc.id AS tipo_carne_id,
+            tc.nombre AS tipo_carne_nombre,
+            SUM(dp.cantidad) AS total_libras
+        FROM pedidos p
+        INNER JOIN detalle_pedidos dp ON p.id = dp.id_pedido
+        INNER JOIN productos_carniceria pc ON dp.id_producto_carniceria = pc.id
+        INNER JOIN productos_catalogo cat ON pc.id_producto_catalogo = cat.id
+        INNER JOIN categorias c ON cat.id_categoria = c.id
+        INNER JOIN tipos_carne tc ON c.id_tipo_carne = tc.id
+        WHERE p.id_carniceria = ${id_carniceria}
+          AND p.id_estado = ${StatePedido.ENTREGADO}
+          AND p.fecha >= ${fechaInicio}
+          AND p.fecha <= ${fechaFin}
+        GROUP BY tc.id, tc.nombre;
+      `;
 
-    // 3. Si el usuario solicita en 'kg', convertimos las libras (1 kg = 2.20462 lb)
-    // Y calculamos los porcentajes y totales para que el frontend pinte las barras directamente.
-    return resultado;
+      // Calcular el volumen global para sacar los porcentajes
+      let volumenGlobal = 0;
+      const datosProcesados = resultado.map(item => {
+        let cantidad = Number(item.total_libras) || 0;
+        
+        // libras a kg (1 kg = 2.20462 lb)
+        if (unidad === 'kg') {
+          cantidad = cantidad / 2.20462;
+        }
+
+        volumenGlobal += cantidad;
+        return {
+          tipo_carne_id: item.tipo_carne_id,
+          tipo_carne_nombre: item.tipo_carne_nombre,
+          cantidad: Number(cantidad.toFixed(2))
+        };
+      });
+
+      // Agregar el porcentaje exacto a cada tipo de carne para la barra de progreso
+      const desgloseConPorcentaje = datosProcesados.map(item => {
+        const porcentaje = volumenGlobal > 0 ? (item.cantidad / volumenGlobal) * 100 : 0;
+        return {
+          ...item,
+          porcentaje: Number(porcentaje.toFixed(1)) // Ej. 75.5%
+        };
+      });
+
+      return {
+        id_carniceria,
+        periodo_aplicado: periodo,
+        unidad_medida: unidad,
+        desde: fechaInicio,
+        hasta: fechaFin,
+        volumen_total_general: Number(volumenGlobal.toFixed(2)),
+        desglose: desgloseConPorcentaje
+      };
+
+    } catch (error) {
+      if (error instanceof CustomError) throw error;
+      throw CustomError.internalServer();
+    }
   }
 
 }
