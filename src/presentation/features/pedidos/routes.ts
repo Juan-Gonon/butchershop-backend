@@ -16,6 +16,7 @@ export class PedidosRouter{
     router.use(RoleMiddleware.authorizeRoles(Role.ADMIN, Role.OPERADOR));
   
     router.get('/metrics', controller.metrics);
+    router.get('/volume-despacho',controller.getVolumeTypeCarne );
 
     return router;
   }

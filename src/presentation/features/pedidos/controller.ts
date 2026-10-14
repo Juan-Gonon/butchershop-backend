@@ -26,4 +26,27 @@ export class PedidosController{
       .then((data) => res.status(200).json({ok: true, data})) // Usar 200 para consultas GET exitosas
       .catch((error) => res.status(400).json({ok: false, error}));
   };
+
+  public getVolumeTypeCarne = async (req: AuthenticatedRequest, res: Response) => {
+    if (!req.user) {
+      return res.status(401).json({ ok: false, error: 'Unauthorized - No user found' });
+    }
+
+    const { uuid, id_carniceria, id_rol } = req.user;
+
+    // 1. Validar los campos individuales
+    if(!uuid) return res.status(400).json({ok: false, error: 'Invalid data: missing uuid'});
+    if(!id_carniceria) return res.status(400).json({ok: false, error: 'Invalid data: missing id_carniceria'});
+    if(!id_rol) return res.status(400).json({ok: false, error: 'Invalid data: missing id_rol'});
+
+    const idCarniceria = getTenantCarniceriaId(req, id_carniceria);
+
+    const periodo = (req.query.periodo as string) || 'hoy';
+    const unidad = (req.query.unidad as string) || 'lb';
+
+    this.pedidoService.getVolumenDespachoPorTipoCarne(idCarniceria, periodo, unidad )
+      .then((data) => res.status(200).json({ok: true, data})) 
+      .catch((error) => res.status(400).json({ok: false, error}));
+    
+  };
 }

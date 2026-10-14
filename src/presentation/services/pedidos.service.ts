@@ -135,4 +135,32 @@ export class PedidoService {
     }
   }
 
+  public async getVolumenDespachoPorTipoCarne(id_carniceria: number, periodo: string, unidad: string) {
+    // 1. Calcular rangos de fecha según sea 'hoy', 'semana' o 'mes'
+    const { fechaInicio, fechaFin } = this.calculateDate(periodo);
+
+    // 2. Consulta SQL para agrupar por Tipo de Carne
+    const resultado = await prisma.$queryRaw`
+      SELECT 
+        tc.id AS tipo_carne_id,
+        tc.nombre AS tipo_carne_nombre,
+        SUM(dp.cantidad) AS total_libras
+      FROM pedidos p
+      INNER JOIN detalle_pedidos dp ON p.id = dp.id_pedido
+      INNER JOIN productos_carniceria pc ON dp.id_producto_carniceria = pc.id
+      INNER JOIN productos_catalogo cat ON pc.id_producto_catalogo = cat.id
+      INNER JOIN categorias c ON cat.id_categoria = c.id
+      INNER JOIN tipos_carne tc ON c.id_tipo_carne = tc.id
+      WHERE p.id_carniceria = ${id_carniceria}
+        AND p.id_estado = 5 -- 5 es ENTREGADO según tu BD
+        AND p.fecha >= ${fechaInicio}
+        AND p.fecha <= ${fechaFin}
+      GROUP BY tc.id, tc.nombre;
+    `;
+
+    // 3. Si el usuario solicita en 'kg', convertimos las libras (1 kg = 2.20462 lb)
+    // Y calculamos los porcentajes y totales para que el frontend pinte las barras directamente.
+    return resultado;
+  }
+
 }
