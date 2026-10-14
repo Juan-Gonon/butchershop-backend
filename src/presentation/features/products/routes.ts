@@ -3,12 +3,14 @@ import { AuthMiddleware } from '../../middleware/validateJWT.js';
 import { RoleMiddleware } from '../../middleware/validateRole.js';
 import { Role } from '../../../domain/types/roles.enums.js';
 import { ProductsController } from './controller.js';
+import { ProductsService } from '../../services/products.service.js';
 
 export class ProductsRouter {
 
   static get router (): Router{
     const router = Router();
-    const controller = new ProductsController();
+    const productsService = new ProductsService();
+    const controller = new ProductsController(productsService);
 
     router.use(AuthMiddleware.validateJWT);
     router.use(RoleMiddleware.authorizeRoles(Role.ADMIN, Role.OPERADOR));
