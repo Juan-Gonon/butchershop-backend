@@ -4,6 +4,7 @@ import { ButcherShopRouter } from '../presentation/features/butcherShop/routes.j
 import { UserRouter } from '../presentation/features/users/routes.js';
 import { PedidosRouter } from '../presentation/features/pedidos/routes.js';
 import { ProductsRouter } from '../presentation/features/products/routes.js';
+import { ClientsRouter } from '../presentation/features/clients/routes.js';
 
 export class AppRouter {
 
@@ -16,6 +17,7 @@ export class AppRouter {
     router.use('/api/user', UserRouter.router);
     router.use('/api/pedidos', PedidosRouter.routes);
     router.use('/api/productos', ProductsRouter.router);
+    router.use('/api/clients', ClientsRouter.router);
 
     return router;
 
