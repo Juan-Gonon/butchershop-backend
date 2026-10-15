@@ -18,6 +18,7 @@ export class PedidosRouter{
     router.get('/metrics', controller.metrics);
     router.get('/volume-despacho',controller.getVolumeTypeCarne );
     router.get('/live', controller.getLivePedidos);
+    router.post('/', controller.createPedido);
 
     return router;
   }

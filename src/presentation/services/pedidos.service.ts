@@ -1,4 +1,5 @@
 import { prisma } from '../../data/postgres/index.js';
+import { CreatePedidoDto } from '../../domain/Dtos/pedidos/createPedidos.dto.js';
 import { CustomError } from '../../domain/errors/custom.error.js';
 import { VolumenPorTipoCarne, VolumenPorUnidad } from '../../domain/interfaces/pedidos.interface.js';
 import { StatePedido } from '../../domain/types/statePedidos.enum.js';
@@ -265,6 +266,77 @@ export class PedidoService {
     } catch (error) {
       if (error instanceof CustomError) throw error;
       throw CustomError.internalServer();
+    }
+  }
+
+  public async createPedidoPos(id_carniceria: number, dto: CreatePedidoDto) {
+    try {
+      const cliente = await prisma.clientes.findFirst({
+        where: {
+          uuid: dto.cliente_uuid,
+          id_carniceria: BigInt(id_carniceria) 
+        }
+      });
+
+      if (!cliente) {
+        throw CustomError.badRequest('El cliente no existe o no pertenece a esta carnicería');
+      }
+  
+      const resultadoTransaccion = await prisma.$transaction(async (tx) => {
+        const nuevoPedido = await tx.pedidos.create({
+          data: {
+            id_carniceria: BigInt(id_carniceria),
+            id_cliente: cliente.id,
+            id_estado: StatePedido.ENTREGADO,
+            id_tipo_entrega: BigInt(dto.id_tipo_entrega),
+            id_direccion_envio: dto.id_direccion_envio ? BigInt(dto.id_direccion_envio) : null,
+            costo_envio: dto.costo_envio,
+            canal_origen: dto.canal_origen,
+            total: dto.total
+          }
+        });
+
+        const detallesData = dto.productos.map((item) => ({
+          id_pedido: nuevoPedido.id,
+          id_producto_carniceria: BigInt(item.id_producto_carniceria),
+          id_tipo_preparacion: item.id_tipo_preparacion ? BigInt(item.id_tipo_preparacion) : null,
+          cantidad: item.cantidad,
+          precio_unitario: item.precio_unitario,
+          subtotal: item.subtotal,
+          observaciones: item.observaciones || null
+        }));
+
+        await tx.detalle_pedidos.createMany({ data: detallesData });
+
+        for (const item of dto.productos) {
+          const productoCarne = await tx.productos_carniceria.findUnique({
+            where: { id: BigInt(item.id_producto_carniceria) }
+          });
+
+          if (productoCarne && productoCarne.maneja_inventario && productoCarne.stock_actual !== null) {
+            const stockActualNum = Number(productoCarne.stock_actual);
+            const nuevoStock = stockActualNum - item.cantidad;
+
+            await tx.productos_carniceria.update({
+              where: { id: BigInt(item.id_producto_carniceria) },
+              data: { stock_actual: nuevoStock >= 0 ? nuevoStock : 0 }
+            });
+          }
+        }
+
+        return nuevoPedido;
+      });
+
+      return {
+        message: 'Venta registrada y cobrada exitosamente',
+        id_pedido: resultadoTransaccion.id.toString(),
+        uuid: resultadoTransaccion.uuid,
+        total_cobrado: resultadoTransaccion.total.toString()
+      };
+
+    } catch (error) {
+      if (error instanceof CustomError) throw error;
+      throw CustomError.internalServer(`Error al procesar la venta en POS: ${error}`);
     }
   }
 
