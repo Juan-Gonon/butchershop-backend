@@ -15,6 +15,7 @@ export class ShippingAddressesRouter {
     router.use(RoleMiddleware.authorizeRoles(Role.ADMIN, Role.OPERADOR));
 
     router.get('/', controller.getActiveAddresses);
+    router.post('/', controller.createAddress);
 
     return router;
   }
