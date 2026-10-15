@@ -5,6 +5,7 @@ import { UserRouter } from '../presentation/features/users/routes.js';
 import { PedidosRouter } from '../presentation/features/pedidos/routes.js';
 import { ProductsRouter } from '../presentation/features/products/routes.js';
 import { ClientsRouter } from '../presentation/features/clients/routes.js';
+import { PreparationsRouter } from '../presentation/features/preparation/routes.js';
 
 export class AppRouter {
 
@@ -18,6 +19,7 @@ export class AppRouter {
     router.use('/api/pedidos', PedidosRouter.routes);
     router.use('/api/productos', ProductsRouter.router);
     router.use('/api/clients', ClientsRouter.router);
+    router.use('/api/preparations', PreparationsRouter.router);
 
     return router;
 
