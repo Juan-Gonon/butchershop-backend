@@ -1,5 +1,6 @@
 import { prisma } from '../../data/postgres/index.js';
 import { CreateShippingAddressDto } from '../../domain/Dtos/shippingAddress/createShippingAddress.dto.js';
+import { UpdateShippingAddressDto } from '../../domain/Dtos/shippingAddress/updateShippingAddress.dto.js';
 import { CustomError } from '../../domain/errors/custom.error.js';
 
 export class ShippingAddressesService {
@@ -45,6 +46,43 @@ export class ShippingAddressesService {
         costo_envio: newAddress.costo_envio.toString(),
         activo: newAddress.activo
       };
+    } catch (error) {
+      if (error instanceof CustomError) throw error;
+      throw CustomError.internalServer();
+    }
+  }
+
+  public async updateAddress(id_carniceria: number, addressId: number, dto: UpdateShippingAddressDto) {
+    try {
+      // Verificamos que la dirección exista y pertenezca estrictamente a este tenant
+      const existingAddress = await prisma.direcciones_envio_carniceria.findFirst({
+        where: {
+          id: BigInt(addressId),
+          id_carniceria: BigInt(id_carniceria)
+        }
+      });
+
+      if (!existingAddress) {
+        throw CustomError.notFound('La dirección de envío no existe o no pertenece a esta carnicería');
+      }
+
+      // Realizamos la actualización
+      const updatedAddress = await prisma.direcciones_envio_carniceria.update({
+        where: { id: BigInt(addressId) },
+        data: {
+          ...(dto.nombre_sector !== undefined && { nombre_sector: dto.nombre_sector }),
+          ...(dto.costo_envio !== undefined && { costo_envio: dto.costo_envio }),
+          ...(dto.activo !== undefined && { activo: dto.activo })
+        }
+      });
+
+      return {
+        id: updatedAddress.id.toString(),
+        nombre_sector: updatedAddress.nombre_sector,
+        costo_envio: updatedAddress.costo_envio.toString(),
+        activo: updatedAddress.activo
+      };
+
     } catch (error) {
       if (error instanceof CustomError) throw error;
       throw CustomError.internalServer();

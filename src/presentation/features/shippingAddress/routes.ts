@@ -16,6 +16,7 @@ export class ShippingAddressesRouter {
 
     router.get('/', controller.getActiveAddresses);
     router.post('/', controller.createAddress);
+    router.patch('/:id', controller.updateAddress);
 
     return router;
   }
