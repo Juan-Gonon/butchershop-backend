@@ -89,4 +89,36 @@ export class ShippingAddressesService {
     }
   }
 
+  public async deleteAddress(id_carniceria: number, addressId: number) {
+    try {
+      // Verificar que la dirección exista y pertenezca al tenant actual
+      const existingAddress = await prisma.direcciones_envio_carniceria.findFirst({
+        where: {
+          id: BigInt(addressId),
+          id_carniceria: BigInt(id_carniceria)
+        }
+      });
+
+      if (!existingAddress) {
+        throw CustomError.notFound('La dirección de envío no existe o no pertenece a esta carnicería');
+      }
+
+      // Realizamos la desactivación lógica (Soft Delete)
+      const deactivatedAddress = await prisma.direcciones_envio_carniceria.update({
+        where: { id: BigInt(addressId) },
+        data: { activo: false }
+      });
+
+      return {
+        message: 'Dirección de envío desactivada exitosamente',
+        id: deactivatedAddress.id.toString(),
+        activo: deactivatedAddress.activo
+      };
+
+    } catch (error) {
+      if (error instanceof CustomError) throw error;
+      throw CustomError.internalServer();
+    }
+  }
+
 }

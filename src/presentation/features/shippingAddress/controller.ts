@@ -78,4 +78,26 @@ export class ShippingAddressesController {
       .then((address) => res.status(200).json({ ok: true, address }))
       .catch((error) => this.handleError(error, res));
   };
+
+  public deleteAddress = async (req: AuthenticatedRequest, res: Response) => {
+    if (!req.user) {
+      return res.status(401).json({ ok: false, error: 'Unauthorized - No user found' });
+    }
+
+    const addressId = Number(req.params.id);
+    if (isNaN(addressId) || addressId <= 0) {
+      return res.status(400).json({ ok: false, error: 'ID de dirección inválido' });
+    }
+
+    const { uuid, id_carniceria, id_rol } = req.user;
+    if (!uuid || !id_carniceria || !id_rol) {
+      return res.status(400).json({ ok: false, error: 'Invalid data' });
+    }
+
+    const idCarniceria = getTenantCarniceriaId(req, id_carniceria);
+
+    this.shippingAddressesService.deleteAddress(idCarniceria, addressId)
+      .then((result) => res.status(200).json({ ok: true, ...result }))
+      .catch((error) => this.handleError(error, res));
+  };
 }
