@@ -139,7 +139,7 @@ export class PedidoService {
     } catch (error) {
       if(error instanceof CustomError) throw error;
       
-      CustomError.internalServer();
+      throw CustomError.internalServer();
     }
   }
   public async getVolumenDespachoPorTipoCarne(id_carniceria: number, periodo: string, unidad: string) {
@@ -271,64 +271,210 @@ export class PedidoService {
 
   public async createPedidoPos(id_carniceria: number, dto: CreatePedidoDto) {
     try {
+      // Validar Cliente y Tenant
       const cliente = await prisma.clientes.findFirst({
         where: {
           uuid: dto.cliente_uuid,
-          id_carniceria: BigInt(id_carniceria) 
+          id_carniceria: BigInt(id_carniceria)
         }
       });
 
       if (!cliente) {
-        throw CustomError.badRequest('El cliente no existe o no pertenece a esta carnicería');
+        throw CustomError.badRequest('El cliente especificado no existe o no pertenece a esta carnicería');
       }
-  
+
+      // Validar Tipo de Entrega
+      const tipoEntrega = await prisma.tipos_entrega.findUnique({
+        where: { id: BigInt(dto.id_tipo_entrega) }
+      });
+
+      if (!tipoEntrega) {
+        throw CustomError.badRequest('El tipo de entrega especificado no existe');
+      }
+
+      // Normalizar nombre de la entrega para evaluación limpia
+      const nombreEntregaLower = tipoEntrega.nombre.toLowerCase();
+      const esDomicilio = nombreEntregaLower.includes('domicilio');
+
+      let costoEnvioReal = 0;
+      let direccionEnvioIdBigInt: bigint | null = null;
+
+      // Regla de Negocio Estricta para Entrega
+      if (esDomicilio) {
+        if (!dto.id_direccion_envio) {
+          throw CustomError.badRequest('Para entregas a domicilio es obligatorio seleccionar una dirección de envío');
+        }
+
+        const direccion = await prisma.direcciones_envio_carniceria.findFirst({
+          where: {
+            id: BigInt(dto.id_direccion_envio),
+            id_carniceria: BigInt(id_carniceria),
+            activo: true
+          }
+        });
+
+        if (!direccion) {
+          throw CustomError.badRequest('La dirección de envío seleccionada no existe, está inactiva o no pertenece a esta carnicería');
+        }
+
+        costoEnvioReal = Number(direccion.costo_envio);
+        direccionEnvioIdBigInt = direccion.id;
+      } else {
+        // En tienda / Recoger: Forzar dirección nula y costo 0
+        costoEnvioReal = 0;
+        direccionEnvioIdBigInt = null;
+      }
+
+      // Validar Tipos de Preparación Enviados
+      const prepIds = Array.from(
+        new Set(dto.productos.map((p) => p.id_tipo_preparacion).filter((id): id is number => id !== null && id !== undefined))
+      );
+
+      if (prepIds.length > 0) {
+        const prepDbCount = await prisma.tipos_preparacion.count({
+          where: {
+            id: { in: prepIds.map((id) => BigInt(id)) },
+            activo: true
+          }
+        });
+
+        if (prepDbCount !== prepIds.length) {
+          throw CustomError.badRequest('Uno o más tipos de preparación seleccionados no son válidos o están inactivos');
+        }
+      }
+
+      // Validar Productos y Pertenencia al Tenant
+      const productIds = Array.from(new Set(dto.productos.map((p) => BigInt(p.id_producto_carniceria))));
+
+      const productosDb = await prisma.productos_carniceria.findMany({
+        where: {
+          id: { in: productIds },
+          id_carniceria: BigInt(id_carniceria) // Multi-Tenant Security
+        },
+        include: {
+          productos_catalogo: true
+        }
+      });
+
+      if (productosDb.length !== productIds.length) {
+        throw CustomError.badRequest('Uno o más productos no existen o no pertenecen a esta carnicería');
+      }
+
+      const productMap = new Map(productosDb.map((p) => [p.id.toString(), p]));
+
+      // Agrupar Cantidades Totales por Producto para la Validación de Inventario Atómico
+      const requerimientosStockMap = new Map<string, number>();
+
+      for (const item of dto.productos) {
+        const prodIdStr = item.id_producto_carniceria.toString();
+        const prodDb = productMap.get(prodIdStr)!;
+
+        if (!prodDb.disponible) {
+          const nombreProd = prodDb.productos_catalogo?.nombre || `ID ${prodDb.id}`;
+          throw CustomError.badRequest(`El producto ${nombreProd} no está disponible para la venta`);
+        }
+
+        if (prodDb.maneja_inventario) {
+          if (prodDb.stock_actual === null) {
+            const nombreProd = prodDb.productos_catalogo?.nombre || `ID ${prodDb.id}`;
+            throw CustomError.badRequest(`El producto ${nombreProd} maneja inventario pero no tiene stock inicial configurado`);
+          }
+
+          const acumulado = requerimientosStockMap.get(prodIdStr) || 0;
+          requerimientosStockMap.set(prodIdStr, acumulado + item.cantidad);
+        }
+      }
+
+      // Calcular Totales con Redondeo Preciso
+      let totalProductosCalculado = 0;
+      const detallesParaInsertar: {
+        id_producto_carniceria: bigint;
+        id_tipo_preparacion: bigint | null;
+        cantidad: number;
+        precio_unitario: number;
+        subtotal: number;
+        observaciones: string | null;
+      }[] = [];
+
+      for (const item of dto.productos) {
+        const prodDb = productMap.get(item.id_producto_carniceria.toString())!;
+        const precioUnitarioReal = Number(prodDb.precio);
+        
+        // Redondeo exacto a 2 decimales para evitar imprecisiones flotantes
+        const subtotalCalculado = Math.round((precioUnitarioReal * item.cantidad) * 100) / 100;
+        totalProductosCalculado += subtotalCalculado;
+
+        detallesParaInsertar.push({
+          id_producto_carniceria: prodDb.id,
+          id_tipo_preparacion: item.id_tipo_preparacion ? BigInt(item.id_tipo_preparacion) : null,
+          cantidad: item.cantidad,
+          precio_unitario: precioUnitarioReal,
+          subtotal: subtotalCalculado,
+          observaciones: item.observaciones || null
+        });
+      }
+
+      const totalGeneral = Math.round((totalProductosCalculado + costoEnvioReal) * 100) / 100;
+
+      // 7. Transacción Atómica
       const resultadoTransaccion = await prisma.$transaction(async (tx) => {
+
+        // 7.1 Resta de Stock Atómica Condicional con Cantidades Agrupadas
+        for (const [prodIdStr, cantidadTotalRequerida] of requerimientosStockMap.entries()) {
+          const prodDb = productMap.get(prodIdStr)!;
+
+          const updateResult = await tx.productos_carniceria.updateMany({
+            where: {
+              id: prodDb.id,
+              id_carniceria: BigInt(id_carniceria),
+              stock_actual: {
+                gte: cantidadTotalRequerida // Verifica que el acumulado completo quepa en el stock
+              }
+            },
+            data: {
+              stock_actual: {
+                decrement: cantidadTotalRequerida // Descontamos el acumulado en una sola instrucción SQL atómica
+              }
+            }
+          });
+
+          if (updateResult.count === 0) {
+            const nombreProd = prodDb.productos_catalogo?.nombre || `ID ${prodDb.id}`;
+            throw CustomError.badRequest(
+              `Stock insuficiente o agotado concurrentemente para ${nombreProd}. Requerido: ${cantidadTotalRequerida}`
+            );
+          }
+        }
+
+        // 7.2 Crear Encabezado del Pedido
         const nuevoPedido = await tx.pedidos.create({
           data: {
             id_carniceria: BigInt(id_carniceria),
             id_cliente: cliente.id,
-            id_estado: StatePedido.ENTREGADO,
+            id_estado: StatePedido.CONFIRMADO,
             id_tipo_entrega: BigInt(dto.id_tipo_entrega),
-            id_direccion_envio: dto.id_direccion_envio ? BigInt(dto.id_direccion_envio) : null,
-            costo_envio: dto.costo_envio,
+            id_direccion_envio: direccionEnvioIdBigInt,
+            costo_envio: costoEnvioReal,
             canal_origen: dto.canal_origen,
-            total: dto.total
+            total: totalGeneral
           }
         });
 
-        const detallesData = dto.productos.map((item) => ({
-          id_pedido: nuevoPedido.id,
-          id_producto_carniceria: BigInt(item.id_producto_carniceria),
-          id_tipo_preparacion: item.id_tipo_preparacion ? BigInt(item.id_tipo_preparacion) : null,
-          cantidad: item.cantidad,
-          precio_unitario: item.precio_unitario,
-          subtotal: item.subtotal,
-          observaciones: item.observaciones || null
+        // 7.3 Crear Líneas de Detalle
+        const detallesConPedidoId = detallesParaInsertar.map((det) => ({
+          ...det,
+          id_pedido: nuevoPedido.id
         }));
 
-        await tx.detalle_pedidos.createMany({ data: detallesData });
-
-        for (const item of dto.productos) {
-          const productoCarne = await tx.productos_carniceria.findUnique({
-            where: { id: BigInt(item.id_producto_carniceria) }
-          });
-
-          if (productoCarne && productoCarne.maneja_inventario && productoCarne.stock_actual !== null) {
-            const stockActualNum = Number(productoCarne.stock_actual);
-            const nuevoStock = stockActualNum - item.cantidad;
-
-            await tx.productos_carniceria.update({
-              where: { id: BigInt(item.id_producto_carniceria) },
-              data: { stock_actual: nuevoStock >= 0 ? nuevoStock : 0 }
-            });
-          }
-        }
+        await tx.detalle_pedidos.createMany({
+          data: detallesConPedidoId
+        });
 
         return nuevoPedido;
       });
 
       return {
-        message: 'Venta registrada y cobrada exitosamente',
+        message: 'Pedido confirmado correctamente',
         id_pedido: resultadoTransaccion.id.toString(),
         uuid: resultadoTransaccion.uuid,
         total_cobrado: resultadoTransaccion.total.toString()
