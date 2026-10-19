@@ -418,6 +418,10 @@ export class PedidoService {
 
       // 7. Transacción Atómica
       const resultadoTransaccion = await prisma.$transaction(async (tx) => {
+        const movimientosParaRegistrar: {
+          id_producto_carniceria: bigint;
+          cantidad: number;
+        }[] = [];
 
         // 7.1 Resta de Stock Atómica Condicional con Cantidades Agrupadas
         for (const [prodIdStr, cantidadTotalRequerida] of requerimientosStockMap.entries()) {
@@ -444,6 +448,11 @@ export class PedidoService {
               `Stock insuficiente o agotado concurrentemente para ${nombreProd}. Requerido: ${cantidadTotalRequerida}`
             );
           }
+
+          movimientosParaRegistrar.push({
+            id_producto_carniceria: prodDb.id,
+            cantidad: cantidadTotalRequerida
+          });
         }
 
         // 7.2 Crear Encabezado del Pedido
@@ -469,6 +478,22 @@ export class PedidoService {
         await tx.detalle_pedidos.createMany({
           data: detallesConPedidoId
         });
+
+        if (movimientosParaRegistrar.length > 0) {
+          await tx.movimientos_inventario.createMany({
+            data: movimientosParaRegistrar.map((movimiento) => ({
+              id_carniceria: BigInt(id_carniceria),
+              id_producto_carniceria: movimiento.id_producto_carniceria,
+              id_pedido: nuevoPedido.id,
+              tipo: 'SALIDA',
+              sentido: 'SALIDA',
+              cantidad: movimiento.cantidad,
+              motivo: 'VENTA_POS',
+              referencia_operacion: `PEDIDO_POS:${nuevoPedido.uuid}`,
+              clave_idempotencia: `PEDIDO_POS:${nuevoPedido.uuid}:SALIDA:${movimiento.id_producto_carniceria}`
+            }))
+          });
+        }
 
         return nuevoPedido;
       });

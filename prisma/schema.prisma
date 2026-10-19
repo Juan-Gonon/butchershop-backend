@@ -7,6 +7,17 @@ datasource db {
   provider = "postgresql"
 }
 
+enum TipoMovimientoInventario {
+  SALIDA
+  DEVOLUCION
+  AJUSTE
+}
+
+enum SentidoMovimientoInventario {
+  ENTRADA
+  SALIDA
+}
+
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model carnicerias {
   id                           BigInt                         @id @default(autoincrement())
@@ -19,6 +30,7 @@ model carnicerias {
   clientes                     clientes[]
   direcciones_envio_carniceria direcciones_envio_carniceria[]
   pedidos                      pedidos[]
+  movimientos_inventario       movimientos_inventario[]
   productos_carniceria         productos_carniceria[]
   usuarios                     usuarios[]
 }
@@ -64,6 +76,7 @@ model detalle_pedidos {
   pedidos                pedidos              @relation(fields: [id_pedido], references: [id], onDelete: Cascade, map: "fk_detalle_pedidos_pedido")
   productos_carniceria   productos_carniceria @relation(fields: [id_producto_carniceria], references: [id], map: "fk_detalle_pedidos_producto")
   tipos_preparacion      tipos_preparacion?   @relation(fields: [id_tipo_preparacion], references: [id], map: "fk_detalle_preparacion")
+  movimientos_inventario movimientos_inventario[]
 
   @@unique([id_pedido, id_producto_carniceria, id_tipo_preparacion], map: "uq_pedido_producto_preparacion")
 }
@@ -104,11 +117,40 @@ model pedidos {
   total                        Decimal                       @default(0) @db.Decimal(10, 2)
   uuid                         String                        @unique @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   detalle_pedidos              detalle_pedidos[]
+  movimientos_inventario       movimientos_inventario[]
   carnicerias                  carnicerias                   @relation(fields: [id_carniceria], references: [id], onDelete: Cascade, map: "fk_pedidos_carniceria")
   clientes                     clientes                      @relation(fields: [id_cliente], references: [id], map: "fk_pedidos_cliente")
   direcciones_envio_carniceria direcciones_envio_carniceria? @relation(fields: [id_direccion_envio], references: [id], map: "fk_pedidos_direccion_envio")
   estados_pedido               estados_pedido                @relation(fields: [id_estado], references: [id], map: "fk_pedidos_estado")
   tipos_entrega                tipos_entrega                 @relation(fields: [id_tipo_entrega], references: [id], map: "fk_pedidos_tipo_entrega")
+}
+
+/// Historial inmutable de las variaciones de inventario asociadas a pedidos.
+model movimientos_inventario {
+  id                     BigInt                         @id @default(autoincrement())
+  id_carniceria          BigInt
+  id_producto_carniceria BigInt
+  id_pedido              BigInt
+  id_detalle_pedido      BigInt?
+  id_movimiento_origen   BigInt?
+  tipo                   TipoMovimientoInventario
+  sentido                SentidoMovimientoInventario
+  cantidad               Decimal                        @db.Decimal(10, 2)
+  motivo                 String                         @db.VarChar(100)
+  referencia_operacion  String                         @db.VarChar(160)
+  clave_idempotencia     String                         @db.VarChar(160)
+  fecha                  DateTime                       @default(now()) @db.Timestamptz(6)
+  carnicerias            carnicerias                    @relation(fields: [id_carniceria], references: [id], onDelete: Restrict, map: "fk_movimientos_inventario_carniceria")
+  productos_carniceria   productos_carniceria           @relation(fields: [id_producto_carniceria], references: [id], onDelete: Restrict, map: "fk_movimientos_inventario_producto")
+  pedidos                pedidos                        @relation(fields: [id_pedido], references: [id], onDelete: Restrict, map: "fk_movimientos_inventario_pedido")
+  detalle_pedidos        detalle_pedidos?               @relation(fields: [id_detalle_pedido], references: [id], onDelete: SetNull, map: "fk_movimientos_inventario_detalle")
+  movimiento_origen      movimientos_inventario?        @relation("movimiento_inventario_origen", fields: [id_movimiento_origen], references: [id], onDelete: Restrict, map: "fk_movimientos_inventario_origen")
+  movimientos_derivados  movimientos_inventario[]       @relation("movimiento_inventario_origen")
+
+  @@unique([id_carniceria, clave_idempotencia], map: "uq_movimientos_inventario_idempotencia")
+  @@index([id_carniceria, id_producto_carniceria, fecha], map: "ix_movimientos_inventario_producto_fecha")
+  @@index([id_carniceria, id_pedido], map: "ix_movimientos_inventario_pedido")
+  @@index([id_movimiento_origen], map: "ix_movimientos_inventario_origen")
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -124,6 +166,7 @@ model productos_carniceria {
   stock_actual         Decimal?           @db.Decimal(10, 2)
   uuid                 String             @unique @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   detalle_pedidos      detalle_pedidos[]
+  movimientos_inventario movimientos_inventario[]
   carnicerias          carnicerias        @relation(fields: [id_carniceria], references: [id], onDelete: Cascade, map: "fk_productos_carniceria")
   unidades_venta       unidades_venta     @relation(fields: [id_unidad_venta], references: [id], map: "fk_productos_carniceria_unidad")
   productos_catalogo   productos_catalogo @relation(fields: [id_producto_catalogo], references: [id], map: "fk_productos_catalogo")

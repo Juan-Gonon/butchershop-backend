@@ -6,3 +6,4 @@ dist/
 .claude/
 .windsurf/
 skills-lock.json
+AGENTS.md
