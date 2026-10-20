@@ -19,6 +19,7 @@ export class PedidosRouter{
     router.get('/volume-despacho',controller.getVolumeTypeCarne );
     router.get('/live', controller.getLivePedidos);
     router.get('/', controller.listPedidos);
+    router.patch('/:uuid/estado', controller.changePedidoState);
     router.get('/:uuid', controller.getPedidoByUuid);
     router.post('/', controller.createPedido);
 

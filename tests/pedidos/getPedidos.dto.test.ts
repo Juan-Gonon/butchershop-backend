@@ -15,7 +15,7 @@ describe('ListPedidosDto', () => {
     const [error, dto] = ListPedidosDto.create({
       page: '2',
       pageSize: '50',
-      estado: 'CONFIRMADO',
+      estado: 'Confirmado',
       desde: '2026-01-01T00:00:00Z',
       hasta: '2026-01-31T23:59:59Z'
     });
@@ -23,7 +23,7 @@ describe('ListPedidosDto', () => {
     assert.equal(error, undefined);
     assert.equal(dto?.page, 2);
     assert.equal(dto?.pageSize, 50);
-    assert.equal(dto?.estado, 'CONFIRMADO');
+    assert.equal(dto?.estado, 'Confirmado');
     assert.ok(dto?.desde instanceof Date);
     assert.ok(dto?.hasta instanceof Date);
   });

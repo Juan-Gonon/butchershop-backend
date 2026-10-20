@@ -4,8 +4,10 @@ import { CustomError } from '../../domain/errors/custom.error.js';
 import { VolumenPorTipoCarne, VolumenPorUnidad } from '../../domain/interfaces/pedidos.interface.js';
 import { StatePedido } from '../../domain/types/statePedidos.enum.js';
 import { ListPedidosDto } from '../../domain/Dtos/pedidos/getPedidos.dto.js';
+import { ChangePedidoStateDto } from '../../domain/Dtos/pedidos/changePedidoState.dto.js';
 import { PedidoAdmin, pedidoAdminInclude } from '../../domain/types/pedidoAdmin.js';
 import { Prisma } from '../../generated/prisma/client.js';
+import { isPedidoStateTransitionAllowed } from '../../domain/types/pedidoStateTransitions.js';
 
 export class PedidoService {
 
@@ -358,6 +360,81 @@ export class PedidoService {
 
       if (!pedido) throw CustomError.notFound('Pedido no encontrado');
       return this.serializarPedido(pedido);
+    } catch (error) {
+      if (error instanceof CustomError) throw error;
+      throw CustomError.internalServer();
+    }
+  }
+
+  public async changePedidoState(
+    id_carniceria: number,
+    uuid: string,
+    dto: ChangePedidoStateDto
+  ) {
+    try {
+      return await prisma.$transaction(async (tx) => {
+        const pedido = await tx.pedidos.findFirst({
+          where: {
+            uuid,
+            id_carniceria: BigInt(id_carniceria)
+          },
+          select: {
+            id_estado: true,
+            estados_pedido: { select: { nombre: true } },
+            tipos_entrega: { select: { nombre: true } }
+          }
+        });
+
+        if (!pedido) throw CustomError.notFound('Pedido no encontrado');
+
+        if (pedido.estados_pedido.nombre !== dto.estado_actual_esperado) {
+          throw CustomError.conflict('El pedido ya no está en el estado esperado; vuelve a consultarlo');
+        }
+
+        if (!isPedidoStateTransitionAllowed(
+          pedido.estados_pedido.nombre as Parameters<typeof isPedidoStateTransitionAllowed>[0],
+          dto.estado_destino,
+          pedido.tipos_entrega.nombre
+        )) {
+          throw CustomError.conflict('La transición solicitada no está permitida para el pedido');
+        }
+
+        const estadoDestino = await tx.estados_pedido.findUnique({
+          where: { nombre: dto.estado_destino },
+          select: { id: true }
+        });
+
+        if (!estadoDestino) {
+          throw CustomError.internalServer('El estado destino no está configurado');
+        }
+
+        const updateResult = await tx.pedidos.updateMany({
+          where: {
+            uuid,
+            id_carniceria: BigInt(id_carniceria),
+            id_estado: pedido.id_estado
+          },
+          data: { id_estado: estadoDestino.id }
+        });
+
+        if (updateResult.count === 0) {
+          const pedidoActual = await tx.pedidos.findFirst({
+            where: { uuid, id_carniceria: BigInt(id_carniceria) },
+            select: { id: true }
+          });
+
+          if (!pedidoActual) throw CustomError.notFound('Pedido no encontrado');
+          throw CustomError.conflict('El pedido cambió concurrentemente; vuelve a consultarlo');
+        }
+
+        const pedidoActualizado = await tx.pedidos.findFirst({
+          where: { uuid, id_carniceria: BigInt(id_carniceria) },
+          include: pedidoAdminInclude
+        });
+
+        if (!pedidoActualizado) throw CustomError.notFound('Pedido no encontrado');
+        return this.serializarPedido(pedidoActualizado);
+      });
     } catch (error) {
       if (error instanceof CustomError) throw error;
       throw CustomError.internalServer();
