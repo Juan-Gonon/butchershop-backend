@@ -34,6 +34,27 @@ describe('ListPedidosDto', () => {
     assert.ok(error);
   });
 
+  it('acepta los seis nombres canónicos de estado', () => {
+    const estados = [
+      'Pendiente',
+      'Confirmado',
+      'En preparación',
+      'En camino',
+      'Entregado',
+      'Cancelado'
+    ] as const;
+
+    for (const estado of estados) {
+      const [error, dto] = ListPedidosDto.create({ estado });
+      assert.equal(error, undefined);
+      assert.equal(dto?.estado, estado);
+    }
+  });
+
+  it('rechaza los nombres de estado con guion bajo', () => {
+    assert.ok(ListPedidosDto.create({ estado: 'En_preparacion' })[0]);
+    assert.ok(ListPedidosDto.create({ estado: 'En_camino' })[0]);
+  });
   it('rechaza estados y rangos de fecha inválidos', () => {
     const [invalidState] = ListPedidosDto.create({ estado: 'DESCONOCIDO' });
     const [invalidRange] = ListPedidosDto.create({

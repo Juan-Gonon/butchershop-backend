@@ -1,10 +1,4 @@
-type EstadoPedidoNombre =
-  | 'Pendiente'
-  | 'Confirmado'
-  | 'En preparación'
-  | 'En camino'
-  | 'Entregado'
-  | 'Cancelado';
+import type { EstadoPedidoNombre } from './pedidoStates.js';
 
 export const isPedidoStateTransitionAllowed = (
   current: EstadoPedidoNombre,
