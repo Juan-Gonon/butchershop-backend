@@ -4,6 +4,7 @@ import { getTenantCarniceriaId } from '../../shared/get.tenant.js';
 import { PedidoService } from '../../services/pedidos.service.js';
 import { CustomError } from '../../../domain/errors/custom.error.js';
 import { CreatePedidoDto } from '../../../domain/Dtos/pedidos/createPedidos.dto.js';
+import { ListPedidosDto, PedidoUuidDto } from '../../../domain/Dtos/pedidos/getPedidos.dto.js';
 
 export class PedidosController{
   constructor(private readonly pedidoService: PedidoService){}
@@ -76,6 +77,40 @@ export class PedidosController{
     this.pedidoService.getLivePedidos(idCarniceria)
       .then((data) => res.status(200).json({ok: true, data})) // Usar 200 para consultas GET exitosas
       .catch((error) => res.status(400).json({ok: false, error}));
+  };
+
+  public listPedidos = async (req: AuthenticatedRequest, res: Response) => {
+    if (!req.user) {
+      return res.status(401).json({ ok: false, error: 'Unauthorized - No user found' });
+    }
+
+    const [validationError, dto] = ListPedidosDto.create(req.query);
+    if (validationError) return res.status(400).json({ ok: false, error: validationError });
+
+    try {
+      const idCarniceria = getTenantCarniceriaId(req);
+      const data = await this.pedidoService.listPedidos(idCarniceria, dto!);
+      return res.status(200).json({ ok: true, data });
+    } catch (error) {
+      return this.handleError(error, res);
+    }
+  };
+
+  public getPedidoByUuid = async (req: AuthenticatedRequest, res: Response) => {
+    if (!req.user) {
+      return res.status(401).json({ ok: false, error: 'Unauthorized - No user found' });
+    }
+
+    const [validationError, dto] = PedidoUuidDto.create(req.params);
+    if (validationError) return res.status(400).json({ ok: false, error: validationError });
+
+    try {
+      const idCarniceria = getTenantCarniceriaId(req);
+      const data = await this.pedidoService.getPedidoByUuid(idCarniceria, dto!.uuid);
+      return res.status(200).json({ ok: true, data });
+    } catch (error) {
+      return this.handleError(error, res);
+    }
   };
 
   public createPedido = (req: AuthenticatedRequest, res: Response) => {

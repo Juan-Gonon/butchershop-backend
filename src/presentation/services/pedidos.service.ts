@@ -3,6 +3,9 @@ import { CreatePedidoDto } from '../../domain/Dtos/pedidos/createPedidos.dto.js'
 import { CustomError } from '../../domain/errors/custom.error.js';
 import { VolumenPorTipoCarne, VolumenPorUnidad } from '../../domain/interfaces/pedidos.interface.js';
 import { StatePedido } from '../../domain/types/statePedidos.enum.js';
+import { ListPedidosDto } from '../../domain/Dtos/pedidos/getPedidos.dto.js';
+import { PedidoAdmin, pedidoAdminInclude } from '../../domain/types/pedidoAdmin.js';
+import { Prisma } from '../../generated/prisma/client.js';
 
 export class PedidoService {
 
@@ -263,6 +266,98 @@ export class PedidoService {
         }))
       }));
 
+    } catch (error) {
+      if (error instanceof CustomError) throw error;
+      throw CustomError.internalServer();
+    }
+  }
+
+  private serializarPedido(pedido: PedidoAdmin) {
+    return {
+      uuid: pedido.uuid,
+      id_pedido: pedido.id.toString(),
+      canal_origen: pedido.canal_origen,
+      fecha: pedido.fecha.toISOString(),
+      estado: pedido.estados_pedido.nombre,
+      tipo_entrega: pedido.tipos_entrega.nombre,
+      costo_envio: pedido.costo_envio.toString(),
+      total: pedido.total.toString(),
+      cliente: {
+        uuid: pedido.clientes.uuid,
+        nombre: pedido.clientes.nombre,
+        telefono: pedido.clientes.telefono
+      },
+      direccion_envio: pedido.direcciones_envio_carniceria
+        ? pedido.direcciones_envio_carniceria.nombre_sector
+        : null,
+      detalles: pedido.detalle_pedidos.map((detalle) => ({
+        id_detalle_pedido: detalle.id.toString(),
+        cantidad: detalle.cantidad.toString(),
+        precio_unitario: detalle.precio_unitario.toString(),
+        subtotal: detalle.subtotal.toString(),
+        observaciones: detalle.observaciones,
+        producto: detalle.productos_carniceria.productos_catalogo.nombre,
+        unidad: detalle.productos_carniceria.unidades_venta.abreviatura,
+        preparacion: detalle.tipos_preparacion?.nombre ?? null
+      }))
+    };
+  }
+
+  public async listPedidos(id_carniceria: number, dto: ListPedidosDto) {
+    try {
+      const where: Prisma.pedidosWhereInput = {
+        id_carniceria: BigInt(id_carniceria),
+        ...(dto.estado ? { estados_pedido: { is: { nombre: dto.estado } } } : {}),
+        ...(dto.cliente_uuid ? { clientes: { is: { uuid: dto.cliente_uuid } } } : {}),
+        ...(dto.desde || dto.hasta
+          ? {
+            fecha: {
+              ...(dto.desde ? { gte: dto.desde } : {}),
+              ...(dto.hasta ? { lte: dto.hasta } : {})
+            }
+          }
+          : {})
+      };
+
+      const skip = (dto.page - 1) * dto.pageSize;
+      const [pedidos, total] = await Promise.all([
+        prisma.pedidos.findMany({
+          where,
+          include: pedidoAdminInclude,
+          orderBy: [{ fecha: 'desc' }, { id: 'desc' }],
+          skip,
+          take: dto.pageSize
+        }),
+        prisma.pedidos.count({ where })
+      ]);
+
+      return {
+        items: pedidos.map((pedido) => this.serializarPedido(pedido)),
+        pagination: {
+          page: dto.page,
+          pageSize: dto.pageSize,
+          total,
+          totalPages: Math.ceil(total / dto.pageSize)
+        }
+      };
+    } catch (error) {
+      if (error instanceof CustomError) throw error;
+      throw CustomError.internalServer();
+    }
+  }
+
+  public async getPedidoByUuid(id_carniceria: number, uuid: string) {
+    try {
+      const pedido = await prisma.pedidos.findFirst({
+        where: {
+          uuid,
+          id_carniceria: BigInt(id_carniceria)
+        },
+        include: pedidoAdminInclude
+      });
+
+      if (!pedido) throw CustomError.notFound('Pedido no encontrado');
+      return this.serializarPedido(pedido);
     } catch (error) {
       if (error instanceof CustomError) throw error;
       throw CustomError.internalServer();
