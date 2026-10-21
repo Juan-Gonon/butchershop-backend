@@ -1,11 +1,12 @@
 import { Response } from 'express';
 import { AuthenticatedRequest } from '../../../domain/interfaces/authenticatesRequest.interface.js';
 import { getTenantCarniceriaId } from '../../shared/get.tenant.js';
-import { PedidoService } from '../../services/pedidos.service.js';
+import type { PedidoService } from '../../services/pedidos.service.js';
 import { CustomError } from '../../../domain/errors/custom.error.js';
 import { CreatePedidoDto } from '../../../domain/Dtos/pedidos/createPedidos.dto.js';
 import { ListPedidosDto, PedidoUuidDto } from '../../../domain/Dtos/pedidos/getPedidos.dto.js';
 import { ChangePedidoStateDto } from '../../../domain/Dtos/pedidos/changePedidoState.dto.js';
+import { UpdatePedidoDetailsDto } from '../../../domain/Dtos/pedidos/updatePedidoDetails.dto.js';
 
 export class PedidosController{
   constructor(private readonly pedidoService: PedidoService){}
@@ -128,6 +129,26 @@ export class PedidosController{
     try {
       const idCarniceria = getTenantCarniceriaId(req);
       const data = await this.pedidoService.changePedidoState(idCarniceria, pedidoUuid!.uuid, dto!);
+      return res.status(200).json({ ok: true, data });
+    } catch (error) {
+      return this.handleError(error, res);
+    }
+  };
+
+  public updatePedidoDetails = async (req: AuthenticatedRequest, res: Response) => {
+    if (!req.user) {
+      return res.status(401).json({ ok: false, error: 'Unauthorized - No user found' });
+    }
+
+    const [uuidError, pedidoUuid] = PedidoUuidDto.create(req.params);
+    if (uuidError) return res.status(400).json({ ok: false, error: uuidError });
+
+    const [bodyError, dto] = UpdatePedidoDetailsDto.create(req.body);
+    if (bodyError) return res.status(400).json({ ok: false, error: bodyError });
+
+    try {
+      const idCarniceria = getTenantCarniceriaId(req);
+      const data = await this.pedidoService.updatePedidoDetails(idCarniceria, pedidoUuid!.uuid, dto!);
       return res.status(200).json({ ok: true, data });
     } catch (error) {
       return this.handleError(error, res);

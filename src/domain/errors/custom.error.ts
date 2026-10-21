@@ -22,6 +22,10 @@ export class CustomError extends Error {
     return new CustomError(409, message);
   }
 
+  static notImplemented(message: string) {
+    return new CustomError(501, message);
+  }
+
   static notFound(message: string) {
     return new CustomError(404, message);
   }

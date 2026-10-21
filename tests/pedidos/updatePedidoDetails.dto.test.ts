@@ -34,8 +34,12 @@ describe('UpdatePedidoDetailsDto', () => {
     assert.equal(dto?.detalles[0]?.id_detalle_pedido, undefined);
   });
 
-  it('rechaza versiones ausentes, no enteras o no positivas', () => {
-    for (const versionEsperada of [undefined, 0, -1, 1.5, '1']) {
+  it('acepta la versión inicial cero y rechaza versiones ausentes, negativas o no enteras', () => {
+    const [zeroError, zeroDto] = UpdatePedidoDetailsDto.create({ ...validPayload, versionEsperada: 0 });
+    assert.equal(zeroError, undefined);
+    assert.equal(zeroDto?.versionEsperada, 0);
+
+    for (const versionEsperada of [undefined, -1, 1.5, '1']) {
       const [error] = UpdatePedidoDetailsDto.create({ ...validPayload, versionEsperada });
       assert.ok(error, `versionEsperada=${String(versionEsperada)} debía rechazarse`);
     }

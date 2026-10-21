@@ -5,11 +5,22 @@ import { VolumenPorTipoCarne, VolumenPorUnidad } from '../../domain/interfaces/p
 import { StatePedido } from '../../domain/types/statePedidos.enum.js';
 import { ListPedidosDto } from '../../domain/Dtos/pedidos/getPedidos.dto.js';
 import { ChangePedidoStateDto } from '../../domain/Dtos/pedidos/changePedidoState.dto.js';
+import { UpdatePedidoDetailsDto } from '../../domain/Dtos/pedidos/updatePedidoDetails.dto.js';
+import type { PedidoDetailsEditor } from '../../domain/interfaces/pedidos.interface.js';
 import { PedidoAdmin, pedidoAdminInclude } from '../../domain/types/pedidoAdmin.js';
 import { Prisma } from '../../generated/prisma/client.js';
 import { isPedidoStateTransitionAllowed } from '../../domain/types/pedidoStateTransitions.js';
 
-export class PedidoService {
+export class PedidoService implements PedidoDetailsEditor {
+  public async updatePedidoDetails(
+    _idCarniceria: number,
+    _pedidoUuid: string,
+    _dto: UpdatePedidoDetailsDto
+  ): Promise<never> {
+    throw CustomError.notImplemented(
+      'La edición de pedidos requiere el soporte transaccional y de esquema pendiente'
+    );
+  }
 
   private calculateDateRange(periodo: string) {
     const periodoLimpio = ['hoy', 'ayer', 'semana', 'mes'].includes(periodo) ? periodo : 'hoy';

@@ -33,7 +33,7 @@ const updatePedidoDetailSchema = z.object({
 const updatePedidoDetailsSchema = z.object({
   versionEsperada: z.number()
     .int('La versión esperada debe ser un entero')
-    .positive('La versión esperada debe ser positiva'),
+    .nonnegative('La versión esperada no puede ser negativa'),
   detalles: z.array(updatePedidoDetailSchema)
     .min(1, 'El pedido debe contener al menos un detalle')
     .max(50, 'El pedido no puede contener más de 50 detalles')

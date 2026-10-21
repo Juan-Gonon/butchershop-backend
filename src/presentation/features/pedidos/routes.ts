@@ -20,6 +20,7 @@ export class PedidosRouter{
     router.get('/live', controller.getLivePedidos);
     router.get('/', controller.listPedidos);
     router.patch('/:uuid/estado', controller.changePedidoState);
+    router.put('/:uuid/detalles', controller.updatePedidoDetails);
     router.get('/:uuid', controller.getPedidoByUuid);
     router.post('/', controller.createPedido);
 
