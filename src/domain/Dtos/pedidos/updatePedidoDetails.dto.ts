@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { normalizePedidoObservations, trimPedidoObservationSpaces } from '../../types/pedidoObservations.js';
 
 // Prisma stores these identifiers as BigInt, so the HTTP contract uses decimal strings
 // to avoid losing precision through JavaScript numbers.
@@ -24,10 +25,11 @@ const updatePedidoDetailSchema = z.object({
     .refine(hasAtMostTwoDecimalPlaces, 'La cantidad admite como máximo 2 decimales')
     .max(300, 'La cantidad excede el límite permitido por venta'),
   observaciones: z.string()
-    .trim()
-    .max(255, 'Las observaciones no pueden exceder 255 caracteres')
+    .transform(trimPedidoObservationSpaces)
+    .pipe(z.string().max(255, 'Las observaciones no pueden exceder 255 caracteres'))
     .nullable()
     .optional()
+    .transform((value) => normalizePedidoObservations(value))
 }).strict();
 
 const updatePedidoDetailsSchema = z.object({

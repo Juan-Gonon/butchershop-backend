@@ -27,6 +27,18 @@ describe('consolidatePedidoLines', () => {
     assert.equal(result[0]?.observaciones, null);
   });
 
+  it('normaliza únicamente espacios U+0020 en los extremos, igual que la migración SQL', () => {
+    const result = consolidatePedidoLines([
+      { id_producto_carniceria: 10, cantidad: 1, observaciones: '  grueso  ' },
+      { id_producto_carniceria: 10, cantidad: 1, observaciones: 'grueso' },
+      { id_producto_carniceria: 10, cantidad: 1, observaciones: '\tgrueso\t' }
+    ]);
+
+    assert.equal(result.length, 2);
+    assert.equal(result.find((line) => line.observaciones === 'grueso')?.cantidad, 2);
+    assert.equal(result.find((line) => line.observaciones === '\tgrueso\t')?.cantidad, 1);
+  });
+
   it('mantiene separadas observaciones distintas, incluyendo diferencias de mayúsculas', () => {
     const result = consolidatePedidoLines([
       { id_producto_carniceria: 10, id_tipo_preparacion: 2, cantidad: 1, observaciones: 'Fino' },

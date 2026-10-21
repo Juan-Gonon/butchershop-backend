@@ -11,16 +11,17 @@ import { PedidoAdmin, pedidoAdminInclude } from '../../domain/types/pedidoAdmin.
 import { consolidatePedidoLines, sumDecimalValues } from '../../domain/types/pedidoLineConsolidation.js';
 import { Prisma } from '../../generated/prisma/client.js';
 import { isPedidoStateTransitionAllowed } from '../../domain/types/pedidoStateTransitions.js';
+import { updatePedidoDetailsTransactional } from './pedidoDetailsEditor.service.js';
 
 export class PedidoService implements PedidoDetailsEditor {
   public async updatePedidoDetails(
-    _idCarniceria: number,
-    _pedidoUuid: string,
-    _dto: UpdatePedidoDetailsDto
-  ): Promise<never> {
-    throw CustomError.notImplemented(
-      'La edición de pedidos requiere el soporte transaccional y de esquema pendiente'
-    );
+    idCarniceria: number,
+    pedidoUuid: string,
+    actorUuid: string,
+    idempotencyKey: string,
+    dto: UpdatePedidoDetailsDto
+  ): Promise<unknown> {
+    return updatePedidoDetailsTransactional(prisma, idCarniceria, pedidoUuid, actorUuid, idempotencyKey, dto);
   }
 
   private calculateDateRange(periodo: string) {
@@ -261,6 +262,21 @@ export class PedidoService implements PedidoDetailsEditor {
         },
         take: 10
       });
+
+      const activeDetailRows = pedidosLive.length
+        ? await prisma.$queryRaw<{ id_pedido: bigint; id: bigint }[]>`
+          SELECT id_pedido, id FROM public.detalle_pedidos
+          WHERE id_pedido IN (${Prisma.join(pedidosLive.map((pedido) => pedido.id))})
+            AND eliminado_en IS NULL
+        `
+        : [];
+      const activeDetailsByOrder = new Map<string, Set<string>>();
+      for (const detail of activeDetailRows) {
+        const key = detail.id_pedido.toString();
+        const ids = activeDetailsByOrder.get(key) ?? new Set<string>();
+        ids.add(detail.id.toString());
+        activeDetailsByOrder.set(key, ids);
+      }
      
       return pedidosLive.map(p => ({
         uuid: p.uuid,
@@ -271,7 +287,7 @@ export class PedidoService implements PedidoDetailsEditor {
         estado: p.estados_pedido.nombre,
         fecha: p.fecha,
         total: p.total.toString(),
-        detalles: p.detalle_pedidos.map(dp => ({
+        detalles: p.detalle_pedidos.filter((dp) => activeDetailsByOrder.get(p.id.toString())?.has(dp.id.toString())).map(dp => ({
           cantidad: dp.cantidad.toString(),
           unidad: dp.productos_carniceria.unidades_venta.abreviatura,
           producto: dp.productos_carniceria.productos_catalogo.nombre,
@@ -286,7 +302,7 @@ export class PedidoService implements PedidoDetailsEditor {
     }
   }
 
-  private serializarPedido(pedido: PedidoAdmin) {
+  private serializarPedido(pedido: PedidoAdmin, version: number, activeDetailIds: Set<string>) {
     return {
       uuid: pedido.uuid,
       id_pedido: pedido.id.toString(),
@@ -296,6 +312,7 @@ export class PedidoService implements PedidoDetailsEditor {
       tipo_entrega: pedido.tipos_entrega.nombre,
       costo_envio: pedido.costo_envio.toString(),
       total: pedido.total.toString(),
+      version,
       cliente: {
         uuid: pedido.clientes.uuid,
         nombre: pedido.clientes.nombre,
@@ -304,7 +321,7 @@ export class PedidoService implements PedidoDetailsEditor {
       direccion_envio: pedido.direcciones_envio_carniceria
         ? pedido.direcciones_envio_carniceria.nombre_sector
         : null,
-      detalles: pedido.detalle_pedidos.map((detalle) => ({
+      detalles: pedido.detalle_pedidos.filter((detalle) => activeDetailIds.has(detalle.id.toString())).map((detalle) => ({
         id_detalle_pedido: detalle.id.toString(),
         cantidad: detalle.cantidad.toString(),
         precio_unitario: detalle.precio_unitario.toString(),
@@ -315,6 +332,40 @@ export class PedidoService implements PedidoDetailsEditor {
         preparacion: detalle.tipos_preparacion?.nombre ?? null
       }))
     };
+  }
+
+  private async pedidosVersionAndActiveDetails(
+    db: Pick<Prisma.TransactionClient, '$queryRaw'>,
+    pedidoIds: bigint[],
+    idCarniceria: bigint
+  ): Promise<Map<string, { version: number; activeDetailIds: Set<string> }>> {
+    if (pedidoIds.length === 0) return new Map();
+    const idList = Prisma.join(pedidoIds);
+    const rows = await db.$queryRaw<{ id: bigint; version: number }[]>`
+      SELECT id, version FROM public.pedidos
+      WHERE id IN (${idList}) AND id_carniceria = ${idCarniceria}
+    `;
+    const activeRows = await db.$queryRaw<{ id: bigint; id_pedido: bigint }[]>`
+      SELECT dp.id, dp.id_pedido
+      FROM public.detalle_pedidos dp
+      JOIN public.pedidos p ON p.id = dp.id_pedido AND p.id_carniceria = ${idCarniceria}
+      WHERE dp.id_pedido IN (${idList}) AND dp.eliminado_en IS NULL
+    `;
+    const output = new Map<string, { version: number; activeDetailIds: Set<string> }>();
+    for (const row of rows) output.set(row.id.toString(), { version: row.version, activeDetailIds: new Set() });
+    for (const row of activeRows) output.get(row.id_pedido.toString())?.activeDetailIds.add(row.id.toString());
+    return output;
+  }
+
+  private async pedidoVersionAndActiveDetails(
+    db: Pick<Prisma.TransactionClient, '$queryRaw'>,
+    idPedido: bigint,
+    idCarniceria: bigint
+  ) {
+    const metadata = await this.pedidosVersionAndActiveDetails(db, [idPedido], idCarniceria);
+    const result = metadata.get(idPedido.toString());
+    if (!result) throw CustomError.notFound('Pedido no encontrado');
+    return result;
   }
 
   public async listPedidos(id_carniceria: number, dto: ListPedidosDto) {
@@ -334,26 +385,36 @@ export class PedidoService implements PedidoDetailsEditor {
       };
 
       const skip = (dto.page - 1) * dto.pageSize;
-      const [pedidos, total] = await Promise.all([
-        prisma.pedidos.findMany({
-          where,
-          include: pedidoAdminInclude,
-          orderBy: [{ fecha: 'desc' }, { id: 'desc' }],
-          skip,
-          take: dto.pageSize
-        }),
-        prisma.pedidos.count({ where })
-      ]);
-
-      return {
-        items: pedidos.map((pedido) => this.serializarPedido(pedido)),
-        pagination: {
-          page: dto.page,
-          pageSize: dto.pageSize,
-          total,
-          totalPages: Math.ceil(total / dto.pageSize)
-        }
-      };
+      return await prisma.$transaction(async (tx) => {
+        const [pedidos, total] = await Promise.all([
+          tx.pedidos.findMany({
+            where,
+            include: pedidoAdminInclude,
+            orderBy: [{ fecha: 'desc' }, { id: 'desc' }],
+            skip,
+            take: dto.pageSize
+          }),
+          tx.pedidos.count({ where })
+        ]);
+        const metadata = await this.pedidosVersionAndActiveDetails(
+          tx,
+          pedidos.map((pedido) => pedido.id),
+          BigInt(id_carniceria)
+        );
+        return {
+          items: pedidos.map((pedido) => {
+            const itemMetadata = metadata.get(pedido.id.toString());
+            if (!itemMetadata) throw CustomError.notFound('Pedido no encontrado');
+            return this.serializarPedido(pedido, itemMetadata.version, itemMetadata.activeDetailIds);
+          }),
+          pagination: {
+            page: dto.page,
+            pageSize: dto.pageSize,
+            total,
+            totalPages: Math.ceil(total / dto.pageSize)
+          }
+        };
+      }, { isolationLevel: 'RepeatableRead' });
     } catch (error) {
       if (error instanceof CustomError) throw error;
       throw CustomError.internalServer();
@@ -362,16 +423,18 @@ export class PedidoService implements PedidoDetailsEditor {
 
   public async getPedidoByUuid(id_carniceria: number, uuid: string) {
     try {
-      const pedido = await prisma.pedidos.findFirst({
-        where: {
-          uuid,
-          id_carniceria: BigInt(id_carniceria)
-        },
-        include: pedidoAdminInclude
-      });
-
-      if (!pedido) throw CustomError.notFound('Pedido no encontrado');
-      return this.serializarPedido(pedido);
+      return await prisma.$transaction(async (tx) => {
+        const pedido = await tx.pedidos.findFirst({
+          where: {
+            uuid,
+            id_carniceria: BigInt(id_carniceria)
+          },
+          include: pedidoAdminInclude
+        });
+        if (!pedido) throw CustomError.notFound('Pedido no encontrado');
+        const metadata = await this.pedidoVersionAndActiveDetails(tx, pedido.id, BigInt(id_carniceria));
+        return this.serializarPedido(pedido, metadata.version, metadata.activeDetailIds);
+      }, { isolationLevel: 'RepeatableRead' });
     } catch (error) {
       if (error instanceof CustomError) throw error;
       throw CustomError.internalServer();
@@ -391,6 +454,7 @@ export class PedidoService implements PedidoDetailsEditor {
             id_carniceria: BigInt(id_carniceria)
           },
           select: {
+            id: true,
             id_estado: true,
             estados_pedido: { select: { nombre: true } },
             tipos_entrega: { select: { nombre: true } }
@@ -420,16 +484,15 @@ export class PedidoService implements PedidoDetailsEditor {
           throw CustomError.internalServer('El estado destino no está configurado');
         }
 
-        const updateResult = await tx.pedidos.updateMany({
-          where: {
-            uuid,
-            id_carniceria: BigInt(id_carniceria),
-            id_estado: pedido.id_estado
-          },
-          data: { id_estado: estadoDestino.id }
-        });
+        const updateResult = await tx.$queryRaw<{ version: number }[]>`
+          UPDATE public.pedidos
+          SET id_estado = ${estadoDestino.id}, version = version + 1
+          WHERE uuid = ${uuid}::uuid AND id_carniceria = ${BigInt(id_carniceria)}
+            AND id_estado = ${pedido.id_estado}
+          RETURNING version
+        `;
 
-        if (updateResult.count === 0) {
+        if (updateResult.length === 0) {
           const pedidoActual = await tx.pedidos.findFirst({
             where: { uuid, id_carniceria: BigInt(id_carniceria) },
             select: { id: true }
@@ -445,7 +508,8 @@ export class PedidoService implements PedidoDetailsEditor {
         });
 
         if (!pedidoActualizado) throw CustomError.notFound('Pedido no encontrado');
-        return this.serializarPedido(pedidoActualizado);
+        const metadata = await this.pedidoVersionAndActiveDetails(tx, pedidoActualizado.id, BigInt(id_carniceria));
+        return this.serializarPedido(pedidoActualizado, metadata.version, metadata.activeDetailIds);
       });
     } catch (error) {
       if (error instanceof CustomError) throw error;

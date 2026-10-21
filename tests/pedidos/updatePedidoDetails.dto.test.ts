@@ -34,6 +34,20 @@ describe('UpdatePedidoDetailsDto', () => {
     assert.equal(dto?.detalles[0]?.id_detalle_pedido, undefined);
   });
 
+  it('normaliza solo espacios U+0020 y conserva tabuladores periféricos como contenido', () => {
+    const [error, dto] = UpdatePedidoDetailsDto.create({
+      versionEsperada: 1,
+      detalles: [
+        { id_producto_carniceria: '7', cantidad: 1, observaciones: '  corte  ' },
+        { id_producto_carniceria: '8', cantidad: 1, observaciones: '\tcorte\t' }
+      ]
+    });
+
+    assert.equal(error, undefined);
+    assert.equal(dto?.detalles[0]?.observaciones, 'corte');
+    assert.equal(dto?.detalles[1]?.observaciones, '\tcorte\t');
+  });
+
   it('acepta la versión inicial cero y rechaza versiones ausentes, negativas o no enteras', () => {
     const [zeroError, zeroDto] = UpdatePedidoDetailsDto.create({ ...validPayload, versionEsperada: 0 });
     assert.equal(zeroError, undefined);

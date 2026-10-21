@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { normalizePedidoObservations, trimPedidoObservationSpaces } from '../../types/pedidoObservations.js';
 
 const detalleItemSchema = z.object({
   id_producto_carniceria: z.number({ error: 'El ID del producto es obligatorio' })
@@ -12,7 +13,12 @@ const detalleItemSchema = z.object({
   cantidad: z.number({ error: 'La cantidad es obligatoria' })
     .positive('La cantidad debe ser mayor a 0')
     .max(300, 'La cantidad excede el límite permitido por venta'),
-  observaciones: z.string().trim().max(255, 'Las observaciones no pueden exceder 255 caracteres').optional().nullable()
+  observaciones: z.string()
+    .transform(trimPedidoObservationSpaces)
+    .pipe(z.string().max(255, 'Las observaciones no pueden exceder 255 caracteres'))
+    .optional()
+    .nullable()
+    .transform((value) => normalizePedidoObservations(value))
 });
 
 const createPedidoSchema = z.object({

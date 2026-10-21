@@ -83,7 +83,7 @@ BEGIN
 END $$;
 
 -- Prisma schema cannot express expression/partial unique indexes. These
--- indexes enforce trimmed, case-sensitive observation equivalence and treat
+-- indexes enforce U+0020-trimmed, case-sensitive observation equivalence and treat
 -- NULL preparation consistently without using a sentinel ID.
 ALTER TABLE public.detalle_pedidos
   DROP CONSTRAINT IF EXISTS uq_pedido_producto_preparacion;
@@ -106,6 +106,24 @@ CREATE UNIQUE INDEX uq_detalle_pedido_producto_preparacion_null_obs_activo
   )
   WHERE eliminado_en IS NULL AND id_tipo_preparacion IS NULL;
 
--- Fail closed until a tenant policy matching the deployed database roles is
--- reviewed and added. The API route for editing remains unimplemented.
 ALTER TABLE public.operaciones_edicion_pedido ENABLE ROW LEVEL SECURITY;
+
+-- The application sets this transaction-local value from the authenticated
+-- tenant before reading or writing operation rows. An unset context matches
+-- no tenant. Table privileges and the deployed database role still require
+-- separate verification; RLS does not grant access by itself.
+CREATE POLICY operaciones_edicion_pedido_tenant_select
+  ON public.operaciones_edicion_pedido
+  FOR SELECT
+  USING (id_carniceria = NULLIF(current_setting('app.tenant_id', TRUE), '')::BIGINT);
+
+CREATE POLICY operaciones_edicion_pedido_tenant_insert
+  ON public.operaciones_edicion_pedido
+  FOR INSERT
+  WITH CHECK (id_carniceria = NULLIF(current_setting('app.tenant_id', TRUE), '')::BIGINT);
+
+CREATE POLICY operaciones_edicion_pedido_tenant_update
+  ON public.operaciones_edicion_pedido
+  FOR UPDATE
+  USING (id_carniceria = NULLIF(current_setting('app.tenant_id', TRUE), '')::BIGINT)
+  WITH CHECK (id_carniceria = NULLIF(current_setting('app.tenant_id', TRUE), '')::BIGINT);

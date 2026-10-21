@@ -16,6 +16,8 @@ export interface PedidoDetailsEditor {
   updatePedidoDetails(
     idCarniceria: number,
     pedidoUuid: string,
+    actorUuid: string,
+    idempotencyKey: string,
     dto: UpdatePedidoDetailsDto
-  ): Promise<never>;
+  ): Promise<unknown>;
 }

@@ -146,9 +146,20 @@ export class PedidosController{
     const [bodyError, dto] = UpdatePedidoDetailsDto.create(req.body);
     if (bodyError) return res.status(400).json({ ok: false, error: bodyError });
 
+    const idempotencyKey = req.header('Idempotency-Key')?.trim();
+    if (!idempotencyKey || idempotencyKey.length > 160) {
+      return res.status(400).json({ ok: false, error: 'El encabezado Idempotency-Key es obligatorio y admite hasta 160 caracteres' });
+    }
+
     try {
       const idCarniceria = getTenantCarniceriaId(req);
-      const data = await this.pedidoService.updatePedidoDetails(idCarniceria, pedidoUuid!.uuid, dto!);
+      const data = await this.pedidoService.updatePedidoDetails(
+        idCarniceria,
+        pedidoUuid!.uuid,
+        req.user.uuid,
+        idempotencyKey,
+        dto!
+      );
       return res.status(200).json({ ok: true, data });
     } catch (error) {
       return this.handleError(error, res);
