@@ -8,6 +8,7 @@ import { ChangePedidoStateDto } from '../../domain/Dtos/pedidos/changePedidoStat
 import { UpdatePedidoDetailsDto } from '../../domain/Dtos/pedidos/updatePedidoDetails.dto.js';
 import type { PedidoDetailsEditor } from '../../domain/interfaces/pedidos.interface.js';
 import { PedidoAdmin, pedidoAdminInclude } from '../../domain/types/pedidoAdmin.js';
+import { consolidatePedidoLines, sumDecimalValues } from '../../domain/types/pedidoLineConsolidation.js';
 import { Prisma } from '../../generated/prisma/client.js';
 import { isPedidoStateTransitionAllowed } from '../../domain/types/pedidoStateTransitions.js';
 
@@ -454,6 +455,11 @@ export class PedidoService implements PedidoDetailsEditor {
 
   public async createPedidoPos(id_carniceria: number, dto: CreatePedidoDto) {
     try {
+      const productosConsolidados = consolidatePedidoLines(dto.productos);
+      if (productosConsolidados.some((item) => item.cantidad > 300)) {
+        throw CustomError.badRequest('La cantidad consolidada de un producto excede el límite permitido por venta');
+      }
+
       // Validar Cliente y Tenant
       const cliente = await prisma.clientes.findFirst({
         where: {
@@ -510,7 +516,7 @@ export class PedidoService implements PedidoDetailsEditor {
 
       // Validar Tipos de Preparación Enviados
       const prepIds = Array.from(
-        new Set(dto.productos.map((p) => p.id_tipo_preparacion).filter((id): id is number => id !== null && id !== undefined))
+        new Set(productosConsolidados.map((p) => p.id_tipo_preparacion).filter((id): id is number => id !== null && id !== undefined))
       );
 
       if (prepIds.length > 0) {
@@ -527,7 +533,7 @@ export class PedidoService implements PedidoDetailsEditor {
       }
 
       // Validar Productos y Pertenencia al Tenant
-      const productIds = Array.from(new Set(dto.productos.map((p) => BigInt(p.id_producto_carniceria))));
+      const productIds = Array.from(new Set(productosConsolidados.map((p) => BigInt(p.id_producto_carniceria))));
 
       const productosDb = await prisma.productos_carniceria.findMany({
         where: {
@@ -548,7 +554,7 @@ export class PedidoService implements PedidoDetailsEditor {
       // Agrupar Cantidades Totales por Producto para la Validación de Inventario Atómico
       const requerimientosStockMap = new Map<string, number>();
 
-      for (const item of dto.productos) {
+      for (const item of productosConsolidados) {
         const prodIdStr = item.id_producto_carniceria.toString();
         const prodDb = productMap.get(prodIdStr)!;
 
@@ -564,7 +570,7 @@ export class PedidoService implements PedidoDetailsEditor {
           }
 
           const acumulado = requerimientosStockMap.get(prodIdStr) || 0;
-          requerimientosStockMap.set(prodIdStr, acumulado + item.cantidad);
+          requerimientosStockMap.set(prodIdStr, sumDecimalValues([acumulado, item.cantidad]));
         }
       }
 
@@ -577,9 +583,10 @@ export class PedidoService implements PedidoDetailsEditor {
         precio_unitario: number;
         subtotal: number;
         observaciones: string | null;
+        maneja_inventario_en_base: boolean;
       }[] = [];
 
-      for (const item of dto.productos) {
+      for (const item of productosConsolidados) {
         const prodDb = productMap.get(item.id_producto_carniceria.toString())!;
         const precioUnitarioReal = Number(prodDb.precio);
         
@@ -593,7 +600,8 @@ export class PedidoService implements PedidoDetailsEditor {
           cantidad: item.cantidad,
           precio_unitario: precioUnitarioReal,
           subtotal: subtotalCalculado,
-          observaciones: item.observaciones || null
+          observaciones: item.observaciones,
+          maneja_inventario_en_base: prodDb.maneja_inventario
         });
       }
 
@@ -659,7 +667,9 @@ export class PedidoService implements PedidoDetailsEditor {
         }));
 
         await tx.detalle_pedidos.createMany({
-          data: detallesConPedidoId
+          // The generated Prisma client is intentionally not regenerated in this
+          // task; snapshot columns are written below using parameterized SQL.
+          data: detallesConPedidoId.map(({ maneja_inventario_en_base: _snapshot, ...detail }) => detail)
         });
 
         if (movimientosParaRegistrar.length > 0) {
@@ -676,6 +686,36 @@ export class PedidoService implements PedidoDetailsEditor {
               clave_idempotencia: `PEDIDO_POS:${nuevoPedido.uuid}:SALIDA:${movimiento.id_producto_carniceria}`
             }))
           });
+        }
+
+        // Store the inventory configuration that was actually applied to each
+        // new line. This also distinguishes legitimate no-stock lines from a
+        // missing movement when the catalog flag changes later.
+        for (const detalle of detallesParaInsertar) {
+          const snapshotCount = await tx.$executeRaw`
+            UPDATE public.detalle_pedidos
+            SET maneja_inventario_en_base = ${detalle.maneja_inventario_en_base}
+            WHERE id_pedido = ${nuevoPedido.id}
+              AND id_producto_carniceria = ${detalle.id_producto_carniceria}
+              AND id_tipo_preparacion IS NOT DISTINCT FROM CAST(${detalle.id_tipo_preparacion} AS BIGINT)
+              AND observaciones IS NOT DISTINCT FROM CAST(${detalle.observaciones} AS TEXT)
+              AND eliminado_en IS NULL
+          `;
+
+          if (snapshotCount !== 1) {
+            throw CustomError.internalServer('No se pudo guardar la trazabilidad de inventario del detalle');
+          }
+        }
+
+        const orderTraceCount = await tx.$executeRaw`
+          UPDATE public.pedidos
+          SET inventario_trazable = TRUE
+          WHERE id = ${nuevoPedido.id}
+            AND id_carniceria = ${BigInt(id_carniceria)}
+        `;
+
+        if (orderTraceCount !== 1) {
+          throw CustomError.internalServer('No se pudo marcar la trazabilidad de inventario del pedido');
         }
 
         return nuevoPedido;
