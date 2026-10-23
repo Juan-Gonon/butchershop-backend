@@ -733,6 +733,7 @@ export class PedidoService implements PedidoDetailsEditor {
         await tx.detalle_pedidos.createMany({
           // The generated Prisma client is intentionally not regenerated in this
           // task; snapshot columns are written below using parameterized SQL.
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
           data: detallesConPedidoId.map(({ maneja_inventario_en_base: _snapshot, ...detail }) => detail)
         });
 
