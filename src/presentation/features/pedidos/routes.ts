@@ -21,6 +21,7 @@ export class PedidosRouter{
     router.get('/', controller.listPedidos);
     router.patch('/:uuid/estado', controller.changePedidoState);
     router.put('/:uuid/detalles', controller.updatePedidoDetails);
+    router.post('/:uuid/cancelar', controller.cancelPedido);
     router.get('/:uuid', controller.getPedidoByUuid);
     router.post('/', controller.createPedido);
 

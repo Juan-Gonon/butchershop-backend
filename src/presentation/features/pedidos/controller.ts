@@ -7,6 +7,7 @@ import { CreatePedidoDto } from '../../../domain/Dtos/pedidos/createPedidos.dto.
 import { ListPedidosDto, PedidoUuidDto } from '../../../domain/Dtos/pedidos/getPedidos.dto.js';
 import { ChangePedidoStateDto } from '../../../domain/Dtos/pedidos/changePedidoState.dto.js';
 import { UpdatePedidoDetailsDto } from '../../../domain/Dtos/pedidos/updatePedidoDetails.dto.js';
+import { CancelPedidoDto } from '../../../domain/Dtos/pedidos/cancelPedido.dto.js';
 
 export class PedidosController{
   constructor(private readonly pedidoService: PedidoService){}
@@ -159,6 +160,30 @@ export class PedidosController{
         req.user.uuid,
         idempotencyKey,
         dto!
+      );
+      return res.status(200).json({ ok: true, data });
+    } catch (error) {
+      return this.handleError(error, res);
+    }
+  };
+
+  public cancelPedido = async (req: AuthenticatedRequest, res: Response) => {
+    if (!req.user) {
+      return res.status(401).json({ ok: false, error: 'Unauthorized - No user found' });
+    }
+
+    const [uuidError, pedidoUuid] = PedidoUuidDto.create(req.params);
+    if (uuidError) return res.status(400).json({ ok: false, error: uuidError });
+
+    const [bodyError] = CancelPedidoDto.create(req.body);
+    if (bodyError) return res.status(400).json({ ok: false, error: bodyError });
+
+    try {
+      const idCarniceria = getTenantCarniceriaId(req);
+      const data = await this.pedidoService.cancelPedido(
+        idCarniceria,
+        pedidoUuid!.uuid,
+        req.user.uuid
       );
       return res.status(200).json({ ok: true, data });
     } catch (error) {

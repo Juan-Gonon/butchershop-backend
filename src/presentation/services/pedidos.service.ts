@@ -24,6 +24,14 @@ export class PedidoService implements PedidoDetailsEditor {
     return updatePedidoDetailsTransactional(prisma, idCarniceria, pedidoUuid, actorUuid, idempotencyKey, dto);
   }
 
+  public async cancelPedido(
+    _idCarniceria: number,
+    _pedidoUuid: string,
+    _actorUuid: string
+  ): Promise<never> {
+    throw CustomError.notImplemented('La cancelación de pedidos aún no está implementada');
+  }
+
   private calculateDateRange(periodo: string) {
     const periodoLimpio = ['hoy', 'ayer', 'semana', 'mes'].includes(periodo) ? periodo : 'hoy';
 
