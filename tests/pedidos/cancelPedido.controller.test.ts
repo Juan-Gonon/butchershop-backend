@@ -36,7 +36,7 @@ describe('PedidosController.cancelPedido', () => {
     const response = await invokeCancelController(async () => {
       called = true;
       return {};
-    }, { params: { uuid: validUuid }, body: undefined });
+    }, { params: { uuid: validUuid }, body: { versionEsperada: 0 } });
 
     assert.equal(response.statusCode, 401);
     assert.equal(called, false);
@@ -50,7 +50,7 @@ describe('PedidosController.cancelPedido', () => {
     }, {
       user: { uuid: 'user-uuid', id_carniceria: 12, id_rol: 1 },
       params: { uuid: 'no-es-uuid' },
-      body: undefined
+      body: { versionEsperada: 0 }
     } as Partial<AuthenticatedRequest>);
     const unexpectedBody = await invokeCancelController(async () => {
       called = true;
@@ -74,10 +74,10 @@ describe('PedidosController.cancelPedido', () => {
     }, {
       user: { uuid: 'user-uuid', id_carniceria: 12, id_rol: 1 },
       params: { uuid: validUuid },
-      body: undefined
+      body: { versionEsperada: 7 }
     } as Partial<AuthenticatedRequest>);
 
-    assert.deepEqual(callArgs, [12, validUuid, 'user-uuid']);
+    assert.deepEqual(callArgs, [12, validUuid, 'user-uuid', 7]);
     assert.equal(response.statusCode, 200);
     assert.deepEqual(response.body, { ok: true, data: { accepted: true } });
   });

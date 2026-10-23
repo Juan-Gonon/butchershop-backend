@@ -175,7 +175,7 @@ export class PedidosController{
     const [uuidError, pedidoUuid] = PedidoUuidDto.create(req.params);
     if (uuidError) return res.status(400).json({ ok: false, error: uuidError });
 
-    const [bodyError] = CancelPedidoDto.create(req.body);
+    const [bodyError, dto] = CancelPedidoDto.create(req.body);
     if (bodyError) return res.status(400).json({ ok: false, error: bodyError });
 
     try {
@@ -183,7 +183,8 @@ export class PedidosController{
       const data = await this.pedidoService.cancelPedido(
         idCarniceria,
         pedidoUuid!.uuid,
-        req.user.uuid
+        req.user.uuid,
+        dto!.versionEsperada
       );
       return res.status(200).json({ ok: true, data });
     } catch (error) {

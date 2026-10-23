@@ -12,6 +12,7 @@ export interface PedidoInventoryMovementEvidence {
   motivo: string;
   referencia_operacion: string;
   clave_idempotencia: string;
+  producto_tenant?: string | null;
   operacion_pedido?: string | null;
   operacion_tenant?: string | null;
 }
@@ -59,6 +60,7 @@ export const reconcilePedidoInventoryReturns = (
     if (!isId(movement.id) || !isId(movement.id_carniceria) || !isId(movement.id_pedido) ||
         !isId(movement.id_producto_carniceria) || movement.id_carniceria !== scope.tenantId ||
         movement.id_pedido !== scope.orderId || byId.has(movement.id) ||
+        (movement.producto_tenant !== undefined && movement.producto_tenant !== scope.tenantId) ||
         (movement.id_detalle_pedido !== null && !isId(movement.id_detalle_pedido)) ||
         (movement.id_movimiento_origen !== null && !isId(movement.id_movimiento_origen)) ||
         (movement.id_operacion_edicion !== null && !isId(movement.id_operacion_edicion)) ||

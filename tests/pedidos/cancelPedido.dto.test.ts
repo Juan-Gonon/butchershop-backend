@@ -3,16 +3,16 @@ import { describe, it } from 'node:test';
 import { CancelPedidoDto } from '../../src/domain/Dtos/pedidos/cancelPedido.dto.js';
 
 describe('CancelPedidoDto', () => {
-  it('acepta una solicitud sin body', () => {
-    const [error, dto] = CancelPedidoDto.create(undefined);
+  it('acepta una versión esperada no negativa', () => {
+    const [error, dto] = CancelPedidoDto.create({ versionEsperada: 0 });
     assert.equal(error, undefined);
-    assert.ok(dto);
+    assert.equal(dto?.versionEsperada, 0);
   });
 
-  it('acepta un objeto vacío cuando Express representa así un body vacío', () => {
-    const [error, dto] = CancelPedidoDto.create({});
-    assert.equal(error, undefined);
-    assert.ok(dto);
+  it('rechaza una versión ausente, negativa o no entera', () => {
+    for (const versionEsperada of [undefined, -1, 1.5, '2']) {
+      assert.ok(CancelPedidoDto.create({ versionEsperada })[0]);
+    }
   });
 
   it('rechaza propiedades extra y otros tipos de body', () => {

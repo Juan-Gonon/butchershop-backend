@@ -12,6 +12,7 @@ import { consolidatePedidoLines, sumDecimalValues } from '../../domain/types/ped
 import { Prisma } from '../../generated/prisma/client.js';
 import { isPedidoStateTransitionAllowed } from '../../domain/types/pedidoStateTransitions.js';
 import { updatePedidoDetailsTransactional } from './pedidoDetailsEditor.service.js';
+import { cancelPedidoTransactional } from './pedidoCancellation.service.js';
 
 export class PedidoService implements PedidoDetailsEditor {
   public async updatePedidoDetails(
@@ -27,9 +28,10 @@ export class PedidoService implements PedidoDetailsEditor {
   public async cancelPedido(
     _idCarniceria: number,
     _pedidoUuid: string,
-    _actorUuid: string
-  ): Promise<never> {
-    throw CustomError.notImplemented('La cancelación de pedidos aún no está implementada');
+    actorUuid: string,
+    versionEsperada: number
+  ): Promise<unknown> {
+    return cancelPedidoTransactional(prisma, _idCarniceria, _pedidoUuid, actorUuid, versionEsperada);
   }
 
   private calculateDateRange(periodo: string) {
