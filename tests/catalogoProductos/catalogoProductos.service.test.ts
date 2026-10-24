@@ -17,10 +17,10 @@ const producto = {
   unidades_venta: { id: 30n, nombre: 'Libra', abreviatura: 'lb' }
 };
 
-type CatalogoDelegate = {
-  findMany: (args: any) => Promise<any[]>;
-  count: (args: any) => Promise<number>;
-};
+interface CatalogoDelegate {
+  findMany: (args: Record<string, unknown>) => Promise<unknown[]>;
+  count: (args: Record<string, unknown>) => Promise<number>;
+}
 
 const delegate = prisma.productos_catalogo as unknown as CatalogoDelegate;
 
@@ -33,13 +33,13 @@ const makeDto = (query: Record<string, unknown>) => {
 
 describe('CatalogoProductosService', () => {
   it('filtra por tipo sin distinguir mayúsculas, ordena y pagina; serializa los BigInt', async (t) => {
-    let findArgs: any;
-    let countArgs: any;
-    t.mock.method(delegate, 'findMany', async (args: any) => {
+    let findArgs: Record<string, unknown> = {};
+    let countArgs: Record<string, unknown> = {};
+    t.mock.method(delegate, 'findMany', async (args: Record<string, unknown>) => {
       findArgs = args;
       return [producto];
     });
-    t.mock.method(delegate, 'count', async (args: any) => {
+    t.mock.method(delegate, 'count', async (args: Record<string, unknown>) => {
       countArgs = args;
       return 21;
     });
@@ -76,8 +76,8 @@ describe('CatalogoProductosService', () => {
   });
 
   it('omite límites cuando todos=true y retorna pagination null', async (t) => {
-    let findArgs: any;
-    t.mock.method(delegate, 'findMany', async (args: any) => {
+    let findArgs: Record<string, unknown> = {};
+    t.mock.method(delegate, 'findMany', async (args: Record<string, unknown>) => {
       findArgs = args;
       return [];
     });

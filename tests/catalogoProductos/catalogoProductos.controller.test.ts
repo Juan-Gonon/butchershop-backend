@@ -6,7 +6,7 @@ import { CatalogoProductosController } from '../../src/presentation/features/cat
 import type { CatalogoProductosService } from '../../src/presentation/services/catalogoProductos.service.js';
 
 const invokeController = async (
-  serviceMethod: (...args: any[]) => Promise<any>,
+  serviceMethod: (...args: unknown[]) => Promise<unknown>,
   request: Partial<AuthenticatedRequest>
 ) => {
   let statusCode = 200;
@@ -55,10 +55,10 @@ describe('CatalogoProductosController.listar', () => {
   });
 
   it('pasa el DTO validado al servicio y devuelve data y pagination', async () => {
-    let receivedDto: any;
+    let receivedDto: { page: number; tipo_carne?: string } | undefined;
     const result = { data: [{ uuid: 'producto-uuid' }], pagination: { page: 1, pageSize: 20, total: 1, totalPages: 1 } };
     const response = await invokeController(async (dto) => {
-      receivedDto = dto;
+      receivedDto = dto as { page: number; tipo_carne?: string };
       return result;
     }, {
       user: { uuid: 'usuario-uuid', id_carniceria: 1, id_rol: 1 },
