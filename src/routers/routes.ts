@@ -7,6 +7,7 @@ import { ProductsRouter } from '../presentation/features/products/routes.js';
 import { ClientsRouter } from '../presentation/features/clients/routes.js';
 import { PreparationsRouter } from '../presentation/features/preparation/routes.js';
 import { ShippingAddressesRouter } from '../presentation/features/shippingAddress/routes.js';
+import { CatalogoProductosRouter } from '../presentation/features/catalogoProductos/routes.js';
 
 export class AppRouter {
 
@@ -22,6 +23,7 @@ export class AppRouter {
     router.use('/api/clients', ClientsRouter.router);
     router.use('/api/preparations', PreparationsRouter.router);
     router.use('/api/direcciones-envio', ShippingAddressesRouter.router);
+    router.use('/api/catalogo-productos', CatalogoProductosRouter.routes);
 
     return router;
 
