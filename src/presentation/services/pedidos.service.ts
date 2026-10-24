@@ -400,7 +400,7 @@ export class PedidoService implements PedidoDetailsEditor {
           tx.pedidos.findMany({
             where,
             include: pedidoAdminInclude,
-            orderBy: [{ fecha: 'desc' }, { id: 'desc' }],
+            orderBy: [{ fecha: 'asc' }, { id: 'asc' }],
             skip,
             take: dto.pageSize
           }),
