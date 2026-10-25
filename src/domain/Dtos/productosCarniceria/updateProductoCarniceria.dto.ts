@@ -1,5 +1,15 @@
 import { z } from 'zod';
 
+const postgresBigIntMax = 9_223_372_036_854_775_807n;
+
+const positiveBigIntIdSchema = z.union([
+  z.string().regex(/^[1-9]\d*$/, 'El ID debe ser un entero positivo'),
+  z.number().int().positive().safe()
+]).transform((value) => String(value)).refine(
+  (value) => BigInt(value) <= postgresBigIntMax,
+  'El ID excede el rango permitido'
+);
+
 const decimalAmountSchema = z.number()
   .finite()
   .min(0, 'El valor no puede ser negativo')
@@ -7,6 +17,7 @@ const decimalAmountSchema = z.number()
   .refine((value) => Number(value.toFixed(2)) === value, 'El valor admite hasta 2 decimales');
 
 const updateProductoCarniceriaSchema = z.object({
+  id_unidad_venta: positiveBigIntIdSchema.optional(),
   precio: decimalAmountSchema.optional(),
   maneja_inventario: z.boolean().optional(),
   stock_actual: decimalAmountSchema.optional()
@@ -14,7 +25,8 @@ const updateProductoCarniceriaSchema = z.object({
   .superRefine((value, context) => {
     if (value.precio === undefined
       && value.maneja_inventario === undefined
-      && value.stock_actual === undefined) {
+      && value.stock_actual === undefined
+      && value.id_unidad_venta === undefined) {
       context.addIssue({
         code: 'custom',
         message: 'Debe especificar al menos un campo para actualizar'
@@ -28,6 +40,7 @@ const updateProductoCarniceriaSchema = z.object({
 
 export class UpdateProductoCarniceriaDto {
   private constructor(
+    public readonly id_unidad_venta: string | undefined,
     public readonly precio: number | undefined,
     public readonly maneja_inventario: boolean | undefined,
     public readonly stock_actual: number | null | undefined
@@ -40,10 +53,10 @@ export class UpdateProductoCarniceriaDto {
       return [result.error.issues[0]?.message || 'Datos de actualización inválidos'];
     }
 
-    const { precio, maneja_inventario, stock_actual } = result.data;
+    const { id_unidad_venta, precio, maneja_inventario, stock_actual } = result.data;
     return [
       undefined,
-      new UpdateProductoCarniceriaDto(precio, maneja_inventario, stock_actual)
+      new UpdateProductoCarniceriaDto(id_unidad_venta, precio, maneja_inventario, stock_actual)
     ];
   }
 }
