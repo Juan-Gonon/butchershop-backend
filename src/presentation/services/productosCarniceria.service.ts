@@ -2,6 +2,7 @@ import { prisma } from '../../data/postgres/index.js';
 import { CustomError } from '../../domain/errors/custom.error.js';
 import { ListProductosCarniceriaDto } from '../../domain/Dtos/productosCarniceria/getProductosCarniceria.dto.js';
 import { CreateProductoCarniceriaDto } from '../../domain/Dtos/productosCarniceria/createProductoCarniceria.dto.js';
+import { UpdateProductoCarniceriaDto } from '../../domain/Dtos/productosCarniceria/updateProductoCarniceria.dto.js';
 
 export class ProductosCarniceriaService {
   public async listar(idCarniceria: number, dto: ListProductosCarniceriaDto) {
@@ -166,6 +167,89 @@ export class ProductosCarniceriaService {
       if (error instanceof CustomError) throw error;
       if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2002') {
         throw CustomError.conflict('El producto ya se encuentra registrado en tu tienda');
+      }
+      throw CustomError.internalServer();
+    }
+  }
+
+  public async actualizar(idCarniceria: number, uuid: string, dto: UpdateProductoCarniceriaDto) {
+    try {
+      const tenantId = BigInt(idCarniceria);
+      const productoActual = await prisma.productos_carniceria.findFirst({
+        where: { uuid, id_carniceria: tenantId },
+        select: { maneja_inventario: true }
+      });
+
+      if (!productoActual) {
+        throw CustomError.notFound('El producto no existe en tu tienda');
+      }
+
+      const idUnidadVenta = dto.id_unidad_venta === undefined
+        ? undefined
+        : BigInt(dto.id_unidad_venta);
+
+      if (idUnidadVenta !== undefined) {
+        const unidadVenta = await prisma.unidades_venta.findUnique({
+          where: { id: idUnidadVenta },
+          select: { id: true }
+        });
+        if (!unidadVenta) throw CustomError.notFound('La unidad de venta no existe');
+      }
+
+      const manejaInventario = dto.maneja_inventario ?? productoActual.maneja_inventario;
+      const data = {
+        ...(dto.precio !== undefined ? { precio: dto.precio } : {}),
+        ...(idUnidadVenta !== undefined ? { id_unidad_venta: idUnidadVenta } : {}),
+        ...(dto.maneja_inventario !== undefined ? { maneja_inventario: dto.maneja_inventario } : {}),
+        ...(manejaInventario
+          ? (dto.stock_actual !== undefined ? { stock_actual: dto.stock_actual } : {})
+          : { stock_actual: null })
+      };
+
+      const producto = await prisma.productos_carniceria.update({
+        where: { uuid, id_carniceria: tenantId },
+        data,
+        include: {
+          productos_catalogo: {
+            include: { categorias: { include: { tipos_carne: true } } }
+          },
+          unidades_venta: true
+        }
+      });
+
+      return {
+        uuid: producto.uuid,
+        precio: producto.precio.toString(),
+        disponible: producto.disponible,
+        maneja_inventario: producto.maneja_inventario,
+        stock_actual: producto.stock_actual === null ? null : producto.stock_actual.toString(),
+        producto_catalogo: {
+          uuid: producto.productos_catalogo.uuid,
+          nombre: producto.productos_catalogo.nombre,
+          descripcion_general: producto.productos_catalogo.descripcion_general,
+          imagen_url: producto.productos_catalogo.imagen_url,
+          categoria: {
+            id: producto.productos_catalogo.categorias.id.toString(),
+            nombre: producto.productos_catalogo.categorias.nombre,
+            tipo_carne: {
+              id: producto.productos_catalogo.categorias.tipos_carne.id.toString(),
+              nombre: producto.productos_catalogo.categorias.tipos_carne.nombre
+            }
+          }
+        },
+        unidad_venta: {
+          id: producto.unidades_venta.id.toString(),
+          nombre: producto.unidades_venta.nombre,
+          abreviatura: producto.unidades_venta.abreviatura
+        }
+      };
+    } catch (error) {
+      if (error instanceof CustomError) throw error;
+      if (typeof error === 'object' && error !== null && 'code' in error) {
+        if (error.code === 'P2025') throw CustomError.notFound('El producto no existe en tu tienda');
+        if (error.code === 'P2002') {
+          throw CustomError.conflict('El producto ya se encuentra registrado en tu tienda');
+        }
       }
       throw CustomError.internalServer();
     }
