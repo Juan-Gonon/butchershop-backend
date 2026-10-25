@@ -3,6 +3,7 @@ import { CustomError } from '../../domain/errors/custom.error.js';
 import { ListProductosCarniceriaDto } from '../../domain/Dtos/productosCarniceria/getProductosCarniceria.dto.js';
 import { CreateProductoCarniceriaDto } from '../../domain/Dtos/productosCarniceria/createProductoCarniceria.dto.js';
 import { UpdateProductoCarniceriaDto } from '../../domain/Dtos/productosCarniceria/updateProductoCarniceria.dto.js';
+import { ToggleDisponibilidadProductoCarniceriaDto } from '../../domain/Dtos/productosCarniceria/toggleDisponibilidadProductoCarniceria.dto.js';
 
 export class ProductosCarniceriaService {
   public async listar(idCarniceria: number, dto: ListProductosCarniceriaDto) {
@@ -250,6 +251,61 @@ export class ProductosCarniceriaService {
         if (error.code === 'P2002') {
           throw CustomError.conflict('El producto ya se encuentra registrado en tu tienda');
         }
+      }
+      throw CustomError.internalServer();
+    }
+  }
+
+  public async toggleDisponibilidad(
+    idCarniceria: number,
+    uuid: string,
+    dto: ToggleDisponibilidadProductoCarniceriaDto
+  ) {
+    try {
+      const producto = await prisma.productos_carniceria.update({
+        where: {
+          uuid,
+          id_carniceria: BigInt(idCarniceria)
+        },
+        data: { disponible: dto.disponible },
+        include: {
+          productos_catalogo: {
+            include: { categorias: { include: { tipos_carne: true } } }
+          },
+          unidades_venta: true
+        }
+      });
+
+      return {
+        uuid: producto.uuid,
+        precio: producto.precio.toString(),
+        disponible: producto.disponible,
+        maneja_inventario: producto.maneja_inventario,
+        stock_actual: producto.stock_actual === null ? null : producto.stock_actual.toString(),
+        producto_catalogo: {
+          uuid: producto.productos_catalogo.uuid,
+          nombre: producto.productos_catalogo.nombre,
+          descripcion_general: producto.productos_catalogo.descripcion_general,
+          imagen_url: producto.productos_catalogo.imagen_url,
+          categoria: {
+            id: producto.productos_catalogo.categorias.id.toString(),
+            nombre: producto.productos_catalogo.categorias.nombre,
+            tipo_carne: {
+              id: producto.productos_catalogo.categorias.tipos_carne.id.toString(),
+              nombre: producto.productos_catalogo.categorias.tipos_carne.nombre
+            }
+          }
+        },
+        unidad_venta: {
+          id: producto.unidades_venta.id.toString(),
+          nombre: producto.unidades_venta.nombre,
+          abreviatura: producto.unidades_venta.abreviatura
+        }
+      };
+    } catch (error) {
+      if (error instanceof CustomError) throw error;
+      if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2025') {
+        throw CustomError.notFound('El producto no existe en tu tienda');
       }
       throw CustomError.internalServer();
     }
