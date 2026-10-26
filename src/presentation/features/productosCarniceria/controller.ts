@@ -1,5 +1,4 @@
 import type { Response } from 'express';
-import { z } from 'zod';
 import type { AuthenticatedRequest } from '../../../domain/interfaces/authenticatesRequest.interface.js';
 import { CustomError } from '../../../domain/errors/custom.error.js';
 import { ListProductosCarniceriaDto } from '../../../domain/Dtos/productosCarniceria/getProductosCarniceria.dto.js';
@@ -8,8 +7,6 @@ import { UpdateProductoCarniceriaDto } from '../../../domain/Dtos/productosCarni
 import { ToggleDisponibilidadProductoCarniceriaDto } from '../../../domain/Dtos/productosCarniceria/toggleDisponibilidadProductoCarniceria.dto.js';
 import { getTenantCarniceriaId } from '../../shared/get.tenant.js';
 import { ProductosCarniceriaService } from '../../services/productosCarniceria.service.js';
-
-const uuidSchema = z.uuid('El UUID del producto no es válido');
 
 export class ProductosCarniceriaController {
   constructor(private readonly productosCarniceriaService: ProductosCarniceriaService) {}
@@ -61,17 +58,15 @@ export class ProductosCarniceriaController {
   public actualizar = async (req: AuthenticatedRequest, res: Response) => {
     if (!this.validateUser(req, res)) return;
 
-    const uuidResult = uuidSchema.safeParse(req.params.uuid);
-    if (!uuidResult.success) {
-      return res.status(400).json({ ok: false, error: uuidResult.error.issues[0]?.message || 'UUID inválido' });
-    }
-
-    const [validationError, dto] = UpdateProductoCarniceriaDto.create(req.body);
+    const [validationError, dto] = UpdateProductoCarniceriaDto.create({
+      ...(req.body ?? {}),
+      uuid: req.params.uuid
+    });
     if (validationError) return res.status(400).json({ ok: false, error: validationError });
 
     try {
       const idCarniceria = getTenantCarniceriaId(req);
-      const result = await this.productosCarniceriaService.actualizar(idCarniceria, uuidResult.data, dto!);
+      const result = await this.productosCarniceriaService.actualizar(idCarniceria, dto!.uuid, dto!);
       return res.status(200).json({ ok: true, data: result });
     } catch (error) {
       return this.handleError(error, res);
@@ -81,17 +76,19 @@ export class ProductosCarniceriaController {
   public toggleDisponibilidad = async (req: AuthenticatedRequest, res: Response) => {
     if (!this.validateUser(req, res)) return;
 
-    const uuidResult = uuidSchema.safeParse(req.params.uuid);
-    if (!uuidResult.success) {
-      return res.status(400).json({ ok: false, error: uuidResult.error.issues[0]?.message || 'UUID inválido' });
-    }
-
-    const [validationError, dto] = ToggleDisponibilidadProductoCarniceriaDto.create(req.body);
+    const [validationError, dto] = ToggleDisponibilidadProductoCarniceriaDto.create({
+      ...(req.body ?? {}),
+      uuid: req.params.uuid
+    });
     if (validationError) return res.status(400).json({ ok: false, error: validationError });
 
     try {
       const idCarniceria = getTenantCarniceriaId(req);
-      const result = await this.productosCarniceriaService.toggleDisponibilidad(idCarniceria, uuidResult.data, dto!);
+      const result = await this.productosCarniceriaService.toggleDisponibilidad(
+        idCarniceria,
+        dto!.uuid,
+        dto!
+      );
       return res.status(200).json({ ok: true, data: result });
     } catch (error) {
       return this.handleError(error, res);

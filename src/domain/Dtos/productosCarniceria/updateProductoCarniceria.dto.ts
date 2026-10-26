@@ -17,6 +17,7 @@ const decimalAmountSchema = z.number()
   .refine((value) => Number(value.toFixed(2)) === value, 'El valor admite hasta 2 decimales');
 
 const updateProductoCarniceriaSchema = z.object({
+  uuid: z.uuid('El UUID del producto no es válido'),
   id_unidad_venta: positiveBigIntIdSchema.optional(),
   precio: decimalAmountSchema.optional(),
   maneja_inventario: z.boolean().optional(),
@@ -40,6 +41,7 @@ const updateProductoCarniceriaSchema = z.object({
 
 export class UpdateProductoCarniceriaDto {
   private constructor(
+    public readonly uuid: string,
     public readonly id_unidad_venta: string | undefined,
     public readonly precio: number | undefined,
     public readonly maneja_inventario: boolean | undefined,
@@ -53,10 +55,10 @@ export class UpdateProductoCarniceriaDto {
       return [result.error.issues[0]?.message || 'Datos de actualización inválidos'];
     }
 
-    const { id_unidad_venta, precio, maneja_inventario, stock_actual } = result.data;
+    const { uuid, id_unidad_venta, precio, maneja_inventario, stock_actual } = result.data;
     return [
       undefined,
-      new UpdateProductoCarniceriaDto(id_unidad_venta, precio, maneja_inventario, stock_actual)
+      new UpdateProductoCarniceriaDto(uuid, id_unidad_venta, precio, maneja_inventario, stock_actual)
     ];
   }
 }
