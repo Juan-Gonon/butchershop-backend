@@ -14,6 +14,9 @@ export class ClientsRouter {
     router.use(AuthMiddleware.validateJWT);
     router.use(RoleMiddleware.authorizeRoles(Role.ADMIN, Role.OPERADOR));
 
+    router.get('/', controller.listar);
+    router.post('/', controller.crear);
+    router.patch('/:uuid', controller.actualizar);
     router.get('/search', controller.searchClients);
 
     return router;
