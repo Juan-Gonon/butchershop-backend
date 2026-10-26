@@ -8,6 +8,7 @@ import { ClientsRouter } from '../presentation/features/clients/routes.js';
 import { PreparationsRouter } from '../presentation/features/preparation/routes.js';
 import { ShippingAddressesRouter } from '../presentation/features/shippingAddress/routes.js';
 import { CatalogoProductosRouter } from '../presentation/features/catalogoProductos/routes.js';
+import { ProductosCarniceriaRouter } from '../presentation/features/productosCarniceria/routes.js';
 
 export class AppRouter {
 
@@ -24,6 +25,7 @@ export class AppRouter {
     router.use('/api/preparations', PreparationsRouter.router);
     router.use('/api/direcciones-envio', ShippingAddressesRouter.router);
     router.use('/api/catalogo-productos', CatalogoProductosRouter.routes);
+    router.use('/api/productos-carniceria', ProductosCarniceriaRouter.routes);
 
     return router;
 
