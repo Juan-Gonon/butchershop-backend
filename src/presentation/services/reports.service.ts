@@ -1,7 +1,8 @@
-﻿import { Prisma } from '../../generated/prisma/client.js';
+import { Prisma } from '../../generated/prisma/client.js';
 import { prisma } from '../../data/postgres/index.js';
 import { ReportDateRangeDto } from '../../domain/Dtos/reports/reportDateRange.dto.js';
 import { CustomError } from '../../domain/errors/custom.error.js';
+import { ReportOrdersQueryDto } from '../../domain/Dtos/reports/reportOrdersQuery.dto.js';
 
 interface VolumeRow {
   unidad_venta: string;
@@ -125,6 +126,69 @@ export class ReportsService {
           cantidad: new Prisma.Decimal(estrella.cantidad).toString()
         } : null
       };
+    } catch (error) {
+      if (error instanceof CustomError) throw error;
+      throw CustomError.internalServer();
+    }
+  }
+
+  public async getOrdersHistory(idCarniceria: number, dto: ReportOrdersQueryDto) {
+    try {
+      const tenantId = BigInt(idCarniceria);
+      const desde = new Date(`${dto.desde}T00:00:00.000`);
+      const hasta = new Date(`${dto.hasta}T23:59:59.999`);
+
+      const estadoEntregado = await prisma.estados_pedido.findUnique({
+        where: { nombre: 'Entregado' },
+        select: { id: true }
+      });
+      if (!estadoEntregado) {
+        throw CustomError.internalServer('El estado Entregado no está configurado');
+      }
+
+      const where: Prisma.pedidosWhereInput = {
+        id_carniceria: tenantId,
+        id_estado: estadoEntregado.id,
+        fecha: { gte: desde, lte: hasta }
+      };
+      const skip = (dto.page - 1) * dto.pageSize;
+
+      return await prisma.$transaction(async (tx) => {
+        const [pedidos, total] = await Promise.all([
+          tx.pedidos.findMany({
+            where,
+            select: {
+              id: true,
+              fecha: true,
+              total: true,
+              clientes: { select: { nombre: true } },
+              tipos_entrega: { select: { nombre: true } },
+              estados_pedido: { select: { nombre: true } }
+            },
+            orderBy: [{ fecha: 'desc' }, { id: 'desc' }],
+            skip,
+            take: dto.pageSize
+          }),
+          tx.pedidos.count({ where })
+        ]);
+
+        return {
+          data: pedidos.map((pedido) => ({
+            folio: pedido.id.toString(),
+            fecha: pedido.fecha.toISOString(),
+            cliente: pedido.clientes.nombre,
+            tipo_entrega: pedido.tipos_entrega.nombre,
+            estado: pedido.estados_pedido.nombre,
+            total: pedido.total.toFixed(2)
+          })),
+          pagination: {
+            page: dto.page,
+            pageSize: dto.pageSize,
+            total,
+            totalPages: Math.ceil(total / dto.pageSize)
+          }
+        };
+      }, { isolationLevel: 'RepeatableRead' });
     } catch (error) {
       if (error instanceof CustomError) throw error;
       throw CustomError.internalServer();
