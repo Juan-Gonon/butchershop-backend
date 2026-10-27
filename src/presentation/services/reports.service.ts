@@ -21,6 +21,19 @@ interface StarProductRow {
   cantidad: string;
 }
 
+interface ProductPerformanceRow {
+  id_producto_catalogo: bigint;
+  producto: string;
+  id_categoria: bigint;
+  categoria: string;
+  id_tipo_carne: bigint;
+  tipo_carne: string;
+  id_unidad_venta: bigint;
+  unidad_venta: string;
+  abreviatura: string;
+  cantidad_vendida: string;
+  total_recaudado: string;
+}
 export class ReportsService {
   public async getSummary(idCarniceria: number, dto: ReportDateRangeDto) {
     try {
@@ -189,6 +202,70 @@ export class ReportsService {
           }
         };
       }, { isolationLevel: 'RepeatableRead' });
+    } catch (error) {
+      if (error instanceof CustomError) throw error;
+      throw CustomError.internalServer();
+    }
+  }
+
+  public async getProductsPerformance(idCarniceria: number, dto: ReportDateRangeDto) {
+    try {
+      const tenantId = BigInt(idCarniceria);
+      const desde = new Date(`${dto.desde}T00:00:00.000`);
+      const hasta = new Date(`${dto.hasta}T23:59:59.999`);
+
+      const estadoEntregado = await prisma.estados_pedido.findUnique({
+        where: { nombre: 'Entregado' },
+        select: { id: true }
+      });
+      if (!estadoEntregado) {
+        throw CustomError.internalServer('El estado Entregado no está configurado');
+      }
+
+      const resultado = await prisma.$queryRaw<ProductPerformanceRow[]>`
+        SELECT cat.id AS id_producto_catalogo,
+               cat.nombre AS producto,
+               c.id AS id_categoria,
+               c.nombre AS categoria,
+               tc.id AS id_tipo_carne,
+               tc.nombre AS tipo_carne,
+               u.id AS id_unidad_venta,
+               u.nombre AS unidad_venta,
+               u.abreviatura,
+               SUM(dp.cantidad)::text AS cantidad_vendida,
+               SUM(dp.subtotal)::text AS total_recaudado
+        FROM public.pedidos p
+        JOIN public.detalle_pedidos dp
+          ON dp.id_pedido = p.id AND dp.eliminado_en IS NULL
+        JOIN public.productos_carniceria pc ON pc.id = dp.id_producto_carniceria
+        JOIN public.productos_catalogo cat ON cat.id = pc.id_producto_catalogo
+        JOIN public.categorias c ON c.id = cat.id_categoria
+        JOIN public.tipos_carne tc ON tc.id = c.id_tipo_carne
+        JOIN public.unidades_venta u ON u.id = pc.id_unidad_venta
+        WHERE p.id_carniceria = ${tenantId}
+          AND p.id_estado = ${estadoEntregado.id}
+          AND p.fecha >= ${desde}
+          AND p.fecha <= ${hasta}
+        GROUP BY cat.id, cat.nombre,
+                 c.id, c.nombre,
+                 tc.id, tc.nombre,
+                 u.id, u.nombre, u.abreviatura
+        ORDER BY SUM(dp.subtotal) DESC, cat.nombre ASC
+      `;
+
+      return resultado.map((row) => ({
+        id_producto_catalogo: row.id_producto_catalogo.toString(),
+        producto: row.producto,
+        id_categoria: row.id_categoria.toString(),
+        categoria: row.categoria,
+        id_tipo_carne: row.id_tipo_carne.toString(),
+        tipo_carne: row.tipo_carne,
+        id_unidad_venta: row.id_unidad_venta.toString(),
+        unidad_venta: row.unidad_venta,
+        abreviatura: row.abreviatura,
+        cantidad_vendida: new Prisma.Decimal(row.cantidad_vendida).toString(),
+        total_recaudado: new Prisma.Decimal(row.total_recaudado).toFixed(2)
+      }));
     } catch (error) {
       if (error instanceof CustomError) throw error;
       throw CustomError.internalServer();
