@@ -15,6 +15,7 @@ export class ReportsRouter {
     router.use(RoleMiddleware.authorizeRoles(Role.ADMIN, Role.OPERADOR));
 
     router.get('/summary', controller.summary);
+    router.get('/orders', controller.orders);
 
     return router;
   }
