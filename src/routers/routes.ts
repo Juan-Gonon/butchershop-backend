@@ -1,4 +1,4 @@
-import { Router } from 'express';
+﻿import { Router } from 'express';
 import { AuthRouter } from '../presentation/features/Auth/routes.js';
 import { ButcherShopRouter } from '../presentation/features/butcherShop/routes.js';
 import { UserRouter } from '../presentation/features/users/routes.js';
@@ -9,11 +9,10 @@ import { PreparationsRouter } from '../presentation/features/preparation/routes.
 import { ShippingAddressesRouter } from '../presentation/features/shippingAddress/routes.js';
 import { CatalogoProductosRouter } from '../presentation/features/catalogoProductos/routes.js';
 import { ProductosCarniceriaRouter } from '../presentation/features/productosCarniceria/routes.js';
+import { ReportsRouter } from '../presentation/features/reports/routes.js';
 
 export class AppRouter {
-
   static get router(): Router {
-
     const router = Router();
 
     router.use('/api/auth', AuthRouter.routes);
@@ -26,8 +25,8 @@ export class AppRouter {
     router.use('/api/direcciones-envio', ShippingAddressesRouter.router);
     router.use('/api/catalogo-productos', CatalogoProductosRouter.routes);
     router.use('/api/productos-carniceria', ProductosCarniceriaRouter.routes);
+    router.use('/api/reports', ReportsRouter.routes);
 
     return router;
-
   }
 }
