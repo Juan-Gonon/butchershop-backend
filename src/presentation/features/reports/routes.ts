@@ -1,4 +1,4 @@
-﻿import { Router } from 'express';
+import { Router } from 'express';
 import { ReportsController } from './controller.js';
 import { ReportsService } from '../../services/reports.service.js';
 import { AuthMiddleware } from '../../middleware/validateJWT.js';
@@ -16,6 +16,7 @@ export class ReportsRouter {
 
     router.get('/summary', controller.summary);
     router.get('/orders', controller.orders);
+    router.get('/products', controller.products);
 
     return router;
   }
