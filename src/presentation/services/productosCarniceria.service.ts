@@ -63,6 +63,7 @@ export class ProductosCarniceriaService {
       return {
         data: productos.map((producto) => ({
           uuid: producto.uuid,
+          id: producto.id,
           precio: producto.precio.toString(),
           disponible: producto.disponible,
           maneja_inventario: producto.maneja_inventario,
