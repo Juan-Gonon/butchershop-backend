@@ -34,6 +34,20 @@ export class ClientsController {
     }
   };
 
+  public getConsumidorFinal = async (req: AuthenticatedRequest, res: Response) => {
+    if (!req.user) {
+      return res.status(401).json({ ok: false, error: 'Unauthorized - No user found' });
+    }
+
+    try {
+      const idCarniceria = getTenantCarniceriaId(req);
+      const cliente = await this.clientsService.getConsumidorFinal(idCarniceria);
+      return res.status(200).json({ ok: true, data: cliente });
+    } catch (error) {
+      return this.handleError(error, res);
+    }
+  };
+
   public crear = async (req: AuthenticatedRequest, res: Response) => {
     if (!req.user) {
       return res.status(401).json({ ok: false, error: 'Unauthorized - No user found' });

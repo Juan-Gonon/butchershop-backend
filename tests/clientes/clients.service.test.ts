@@ -8,6 +8,7 @@ import { UpdateClientDto } from '../../src/domain/Dtos/clients/updateClient.dto.
 import { ClientsService } from '../../src/presentation/services/clients.service.js';
 
 interface ClientsDelegate {
+  findFirst(args: Record<string, unknown>): Promise<unknown>;
   findMany(args: Record<string, unknown>): Promise<unknown[]>;
   count(args: Record<string, unknown>): Promise<number>;
   create(args: Record<string, unknown>): Promise<unknown>;
@@ -57,6 +58,33 @@ const hasStatus = (statusCode: number, message?: string) => (error: unknown) =>
   error instanceof CustomError
   && error.statusCode === statusCode
   && (message === undefined || error.message === message);
+
+describe('ClientsService.getConsumidorFinal', () => {
+  it('busca el genérico dentro del tenant y lo serializa', async (t) => {
+    let findArgs: Record<string, unknown> = {};
+    stubMethod(t, clients, 'findFirst', async (args: Record<string, unknown>) => {
+      findArgs = args;
+      return clientRecord({ nombre: 'Consumidor Final', es_generico: true });
+    });
+
+    const result = await service.getConsumidorFinal(42);
+
+    assert.deepEqual(findArgs.where, { id_carniceria: 42n, es_generico: true });
+    assert.equal(result.nombre, 'Consumidor Final');
+    assert.equal(result.es_generico, true);
+    assert.equal(result.id, '7');
+    assert.doesNotThrow(() => JSON.stringify(result));
+  });
+
+  it('responde con 404 cuando la carnicería no tiene cliente genérico', async (t) => {
+    stubMethod(t, clients, 'findFirst', async () => null);
+
+    await assert.rejects(
+      service.getConsumidorFinal(42),
+      hasStatus(404, 'No existe un cliente Consumidor Final para esta carnicería')
+    );
+  });
+});
 
 describe('ClientsService.listar', () => {
   it('aísla por tenant, aplica filtros, orden estable, paginación y métricas', async (t) => {

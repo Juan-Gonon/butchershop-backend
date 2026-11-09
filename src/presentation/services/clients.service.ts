@@ -27,6 +27,26 @@ const hasPrismaCode = (error: unknown, code: string): boolean =>
 
 export class ClientsService {
 
+  public async getConsumidorFinal(idCarniceria: number) {
+    try {
+      const cliente = await prisma.clientes.findFirst({
+        where: {
+          id_carniceria: BigInt(idCarniceria),
+          es_generico: true
+        }
+      });
+
+      if (!cliente) {
+        throw CustomError.notFound('No existe un cliente Consumidor Final para esta carnicería');
+      }
+
+      return serializeClient(cliente);
+    } catch (error) {
+      if (error instanceof CustomError) throw error;
+      throw CustomError.internalServer();
+    }
+  }
+
   public async listar(idCarniceria: number, dto: ListClientsDto) {
     const where = {
       id_carniceria: BigInt(idCarniceria),

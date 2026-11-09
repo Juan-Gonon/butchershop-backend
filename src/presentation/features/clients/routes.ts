@@ -12,6 +12,13 @@ export class ClientsRouter {
     const controller = new ClientsController(service);
 
     router.use(AuthMiddleware.validateJWT);
+
+    router.get(
+      '/consumidor-final',
+      RoleMiddleware.authorizeRoles(Role.ADMIN, Role.OPERADOR, Role.CAJERO),
+      controller.getConsumidorFinal
+    );
+
     router.use(RoleMiddleware.authorizeRoles(Role.ADMIN, Role.OPERADOR));
 
     router.get('/', controller.listar);
