@@ -312,7 +312,7 @@ export class PedidoService implements PedidoDetailsEditor {
     }
   }
 
-  private serializarPedido(pedido: PedidoAdmin, activeDetailIds: Set<string>) {
+  private serializarPedido(pedido: PedidoAdmin) {
     return {
       uuid: pedido.uuid,
       id_pedido: pedido.id.toString(),
@@ -331,7 +331,7 @@ export class PedidoService implements PedidoDetailsEditor {
       direccion_envio: pedido.direcciones_envio_carniceria
         ? pedido.direcciones_envio_carniceria.nombre_sector
         : null,
-      detalles: pedido.detalle_pedidos.filter((detalle) => activeDetailIds.has(detalle.id.toString())).map((detalle) => ({
+      detalles: pedido.detalle_pedidos.filter((detalle) => detalle.eliminado_en === null).map((detalle) => ({
         id_detalle_pedido: detalle.id.toString(),
         cantidad: detalle.cantidad.toString(),
         precio_unitario: detalle.precio_unitario.toString(),
@@ -342,36 +342,6 @@ export class PedidoService implements PedidoDetailsEditor {
         preparacion: detalle.tipos_preparacion?.nombre ?? null
       }))
     };
-  }
-
-  private async pedidosActiveDetailIds(
-    db: Pick<Prisma.TransactionClient, '$queryRaw'>,
-    pedidoIds: bigint[],
-    idCarniceria: bigint
-  ): Promise<Map<string, Set<string>>> {
-    if (pedidoIds.length === 0) return new Map();
-    const idList = Prisma.join(pedidoIds);
-    const activeRows = await db.$queryRaw<{ id: bigint; id_pedido: bigint }[]>`
-      SELECT dp.id, dp.id_pedido
-      FROM public.detalle_pedidos dp
-      JOIN public.pedidos p ON p.id = dp.id_pedido AND p.id_carniceria = ${idCarniceria}
-      WHERE dp.id_pedido IN (${idList}) AND dp.eliminado_en IS NULL
-    `;
-    const output = new Map<string, Set<string>>();
-    for (const pedidoId of pedidoIds) output.set(pedidoId.toString(), new Set());
-    for (const row of activeRows) output.get(row.id_pedido.toString())?.add(row.id.toString());
-    return output;
-  }
-
-  private async pedidoActiveDetailIds(
-    db: Pick<Prisma.TransactionClient, '$queryRaw'>,
-    idPedido: bigint,
-    idCarniceria: bigint
-  ) {
-    const metadata = await this.pedidosActiveDetailIds(db, [idPedido], idCarniceria);
-    const result = metadata.get(idPedido.toString());
-    if (!result) throw CustomError.notFound('Pedido no encontrado');
-    return result;
   }
 
   public async listPedidos(id_carniceria: number, dto: ListPedidosDto) {
@@ -402,17 +372,8 @@ export class PedidoService implements PedidoDetailsEditor {
           }),
           tx.pedidos.count({ where })
         ]);
-        const activeDetailIdsByPedido = await this.pedidosActiveDetailIds(
-          tx,
-          pedidos.map((pedido) => pedido.id),
-          BigInt(id_carniceria)
-        );
         return {
-          items: pedidos.map((pedido) => {
-            const activeDetailIds = activeDetailIdsByPedido.get(pedido.id.toString());
-            if (!activeDetailIds) throw CustomError.notFound('Pedido no encontrado');
-            return this.serializarPedido(pedido, activeDetailIds);
-          }),
+          items: pedidos.map((pedido) => this.serializarPedido(pedido)),
           pagination: {
             page: dto.page,
             pageSize: dto.pageSize,
@@ -438,8 +399,7 @@ export class PedidoService implements PedidoDetailsEditor {
           include: pedidoAdminInclude
         });
         if (!pedido) throw CustomError.notFound('Pedido no encontrado');
-        const activeDetailIds = await this.pedidoActiveDetailIds(tx, pedido.id, BigInt(id_carniceria));
-        return this.serializarPedido(pedido, activeDetailIds);
+        return this.serializarPedido(pedido);
       }, { isolationLevel: 'RepeatableRead' });
     } catch (error) {
       if (error instanceof CustomError) throw error;
@@ -514,8 +474,7 @@ export class PedidoService implements PedidoDetailsEditor {
         });
 
         if (!pedidoActualizado) throw CustomError.notFound('Pedido no encontrado');
-        const activeDetailIds = await this.pedidoActiveDetailIds(tx, pedidoActualizado.id, BigInt(id_carniceria));
-        return this.serializarPedido(pedidoActualizado, activeDetailIds);
+        return this.serializarPedido(pedidoActualizado);
       });
     } catch (error) {
       if (error instanceof CustomError) throw error;
