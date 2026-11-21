@@ -312,7 +312,7 @@ export class PedidoService implements PedidoDetailsEditor {
     }
   }
 
-  private serializarPedido(pedido: PedidoAdmin, version: number, activeDetailIds: Set<string>) {
+  private serializarPedido(pedido: PedidoAdmin, activeDetailIds: Set<string>) {
     return {
       uuid: pedido.uuid,
       id_pedido: pedido.id.toString(),
@@ -322,7 +322,7 @@ export class PedidoService implements PedidoDetailsEditor {
       tipo_entrega: pedido.tipos_entrega.nombre,
       costo_envio: pedido.costo_envio.toString(),
       total: pedido.total.toString(),
-      version,
+      version: pedido.version,
       cliente: {
         uuid: pedido.clientes.uuid,
         nombre: pedido.clientes.nombre,
@@ -344,35 +344,31 @@ export class PedidoService implements PedidoDetailsEditor {
     };
   }
 
-  private async pedidosVersionAndActiveDetails(
+  private async pedidosActiveDetailIds(
     db: Pick<Prisma.TransactionClient, '$queryRaw'>,
     pedidoIds: bigint[],
     idCarniceria: bigint
-  ): Promise<Map<string, { version: number; activeDetailIds: Set<string> }>> {
+  ): Promise<Map<string, Set<string>>> {
     if (pedidoIds.length === 0) return new Map();
     const idList = Prisma.join(pedidoIds);
-    const rows = await db.$queryRaw<{ id: bigint; version: number }[]>`
-      SELECT id, version FROM public.pedidos
-      WHERE id IN (${idList}) AND id_carniceria = ${idCarniceria}
-    `;
     const activeRows = await db.$queryRaw<{ id: bigint; id_pedido: bigint }[]>`
       SELECT dp.id, dp.id_pedido
       FROM public.detalle_pedidos dp
       JOIN public.pedidos p ON p.id = dp.id_pedido AND p.id_carniceria = ${idCarniceria}
       WHERE dp.id_pedido IN (${idList}) AND dp.eliminado_en IS NULL
     `;
-    const output = new Map<string, { version: number; activeDetailIds: Set<string> }>();
-    for (const row of rows) output.set(row.id.toString(), { version: row.version, activeDetailIds: new Set() });
-    for (const row of activeRows) output.get(row.id_pedido.toString())?.activeDetailIds.add(row.id.toString());
+    const output = new Map<string, Set<string>>();
+    for (const pedidoId of pedidoIds) output.set(pedidoId.toString(), new Set());
+    for (const row of activeRows) output.get(row.id_pedido.toString())?.add(row.id.toString());
     return output;
   }
 
-  private async pedidoVersionAndActiveDetails(
+  private async pedidoActiveDetailIds(
     db: Pick<Prisma.TransactionClient, '$queryRaw'>,
     idPedido: bigint,
     idCarniceria: bigint
   ) {
-    const metadata = await this.pedidosVersionAndActiveDetails(db, [idPedido], idCarniceria);
+    const metadata = await this.pedidosActiveDetailIds(db, [idPedido], idCarniceria);
     const result = metadata.get(idPedido.toString());
     if (!result) throw CustomError.notFound('Pedido no encontrado');
     return result;
@@ -406,16 +402,16 @@ export class PedidoService implements PedidoDetailsEditor {
           }),
           tx.pedidos.count({ where })
         ]);
-        const metadata = await this.pedidosVersionAndActiveDetails(
+        const activeDetailIdsByPedido = await this.pedidosActiveDetailIds(
           tx,
           pedidos.map((pedido) => pedido.id),
           BigInt(id_carniceria)
         );
         return {
           items: pedidos.map((pedido) => {
-            const itemMetadata = metadata.get(pedido.id.toString());
-            if (!itemMetadata) throw CustomError.notFound('Pedido no encontrado');
-            return this.serializarPedido(pedido, itemMetadata.version, itemMetadata.activeDetailIds);
+            const activeDetailIds = activeDetailIdsByPedido.get(pedido.id.toString());
+            if (!activeDetailIds) throw CustomError.notFound('Pedido no encontrado');
+            return this.serializarPedido(pedido, activeDetailIds);
           }),
           pagination: {
             page: dto.page,
@@ -442,8 +438,8 @@ export class PedidoService implements PedidoDetailsEditor {
           include: pedidoAdminInclude
         });
         if (!pedido) throw CustomError.notFound('Pedido no encontrado');
-        const metadata = await this.pedidoVersionAndActiveDetails(tx, pedido.id, BigInt(id_carniceria));
-        return this.serializarPedido(pedido, metadata.version, metadata.activeDetailIds);
+        const activeDetailIds = await this.pedidoActiveDetailIds(tx, pedido.id, BigInt(id_carniceria));
+        return this.serializarPedido(pedido, activeDetailIds);
       }, { isolationLevel: 'RepeatableRead' });
     } catch (error) {
       if (error instanceof CustomError) throw error;
@@ -518,8 +514,8 @@ export class PedidoService implements PedidoDetailsEditor {
         });
 
         if (!pedidoActualizado) throw CustomError.notFound('Pedido no encontrado');
-        const metadata = await this.pedidoVersionAndActiveDetails(tx, pedidoActualizado.id, BigInt(id_carniceria));
-        return this.serializarPedido(pedidoActualizado, metadata.version, metadata.activeDetailIds);
+        const activeDetailIds = await this.pedidoActiveDetailIds(tx, pedidoActualizado.id, BigInt(id_carniceria));
+        return this.serializarPedido(pedidoActualizado, activeDetailIds);
       });
     } catch (error) {
       if (error instanceof CustomError) throw error;
